@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+build
+coverage
+playwright-report
+test-results
+playwright/.auth
+yarn.lock
+docs/
+src/generated/prisma

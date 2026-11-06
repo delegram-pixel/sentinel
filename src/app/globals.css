@@ -1,0 +1,449 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-text-secondary: var(--text-secondary);
+  --color-muted-strong: var(--muted-strong);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-control-border: var(--control-border);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-display: var(--font-source-serif), Georgia, serif;
+
+  --radius-sm: 0.125rem;
+  --radius-md: 0.1875rem;
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  /* ADR-026 — Editorial Research Console. */
+  --background: #f4f2ec;
+  --surface: #fbfaf7;
+  --surface-elevated: #ffffff;
+  --foreground: #191b1e;
+  /* The brief's #73777c is retained for text on white; small text on paper needs AA contrast. */
+  --text-secondary: #666a70;
+  --text-muted-on-white: #73777c;
+  --muted-strong: #666a70;
+  --border: #dcdad3;
+  --control-border: #85898f;
+  --primary: #3659a8;
+  --primary-foreground: #ffffff;
+  --secondary: color-mix(in srgb, var(--foreground) 4%, var(--surface));
+  --secondary-foreground: var(--foreground);
+  --muted: var(--secondary);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--secondary);
+  --accent-foreground: var(--foreground);
+  --destructive: #9a4945;
+  --destructive-foreground: #ffffff;
+  --success: #3f6b52;
+  --warning: #806027;
+  --danger: #9a4945;
+  --ring: var(--primary);
+  --radius: 0.25rem;
+
+  /* shadcn/ui surface aliases */
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-elevated);
+  --popover-foreground: var(--foreground);
+  --input: var(--control-border);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100dvh;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+    color: var(--foreground);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  a {
+    text-underline-offset: 4px;
+  }
+
+  button,
+  a,
+  summary {
+    touch-action: manipulation;
+  }
+
+  input,
+  textarea,
+  select,
+  button,
+  summary {
+    scroll-margin-block: 5rem 2rem;
+  }
+}
+
+@layer components {
+  .page-stack {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .page-heading {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 2.8vw, 2.75rem);
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+
+  .research-section {
+    min-width: 0;
+    scroll-margin-top: 5rem;
+  }
+
+  .section-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding-block: 0.875rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .section-title {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: -0.015em;
+  }
+
+  .section-body {
+    min-width: 0;
+    padding-top: 0.5rem;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding-block: 1.5rem 2rem;
+  }
+
+  .record-table-region {
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .record-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .record-table th {
+    padding: 0.75rem 0.875rem;
+    border-block: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .record-table td {
+    padding: 1.125rem 0.875rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .record-table th:first-child,
+  .record-table td:first-child {
+    padding-left: 0;
+  }
+
+  .record-table th:last-child,
+  .record-table td:last-child {
+    padding-right: 0;
+  }
+
+  .record-table tbody tr {
+    transition: background-color 120ms ease;
+  }
+
+  .record-table tbody tr:hover {
+    background: var(--secondary);
+  }
+
+  .record-table-region[data-overflow="true"] .record-table th:first-child,
+  .record-table-region[data-overflow="true"] .record-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: clamp(10rem, 45vw, 15rem);
+    min-width: 10rem;
+    max-width: clamp(10rem, 45vw, 15rem);
+    padding-right: 0.875rem;
+    background: var(--background);
+    box-shadow: 1px 0 0 var(--border);
+  }
+
+  .record-table-region[data-overflow="true"] .record-table tbody tr:hover td:first-child {
+    background: var(--secondary);
+  }
+
+  .record-table td {
+    overflow-wrap: anywhere;
+  }
+
+  .record-link {
+    font-weight: 500;
+    overflow-wrap: anywhere;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+
+  .record-link:hover {
+    color: var(--primary);
+    text-decoration-line: underline;
+  }
+
+  .record-metadata {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metadata-list {
+    display: grid;
+    min-width: 0;
+    gap: 1.25rem;
+  }
+
+  .metadata-list dt {
+    margin-bottom: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .metadata-list dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .research-record {
+    min-width: 0;
+    padding-block: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .research-record:first-child {
+    padding-top: 0.5rem;
+  }
+
+  .research-record:last-child {
+    border-bottom: 0;
+  }
+
+  .disclosure {
+    min-width: 0;
+    border-block: 1px solid var(--border);
+  }
+
+  .disclosure > summary {
+    display: flex;
+    min-height: 2.75rem;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.75rem;
+    font-weight: 500;
+  }
+
+  .disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .disclosure > summary svg {
+    flex-shrink: 0;
+    transition: transform 160ms ease;
+  }
+
+  .disclosure[open] > summary svg {
+    transform: rotate(180deg);
+  }
+
+  .disclosure-body {
+    padding-block: 0.5rem 1.5rem;
+  }
+
+  .form-stack {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .research-workbench {
+    display: grid;
+    min-width: 0;
+    gap: 2rem;
+  }
+
+  .research-context {
+    min-width: 0;
+  }
+
+  .research-document {
+    min-width: 0;
+  }
+
+  .research-copy {
+    max-width: 75ch;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .research-assistant {
+    min-width: 0;
+  }
+
+  [data-slot="sheet-content"] {
+    overscroll-behavior: contain;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  [data-slot="sheet-overlay"][data-state="open"] {
+    animation: panel-fade 140ms ease;
+  }
+
+  [data-slot="sheet-content"][data-state="open"] {
+    animation: panel-enter 160ms ease;
+  }
+
+  @keyframes panel-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes panel-enter {
+    from {
+      opacity: 0;
+      transform: translateX(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .page-stack {
+      gap: 2.5rem;
+    }
+
+    .research-workbench {
+      grid-template-columns: 12.5rem minmax(0, 1fr);
+    }
+
+    .research-context {
+      position: sticky;
+      top: 5.5rem;
+      align-self: start;
+      max-height: calc(100dvh - 7rem);
+      overflow-y: auto;
+    }
+  }
+
+  @media (min-width: 1440px) {
+    .research-workbench[data-assistant-open="true"] {
+      grid-template-columns: 11rem minmax(0, 1fr) 19rem;
+      gap: 1.5rem;
+    }
+
+    .research-assistant {
+      position: sticky;
+      top: 5.5rem;
+      align-self: start;
+      padding-left: 1.5rem;
+      border-left: 1px solid var(--border);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

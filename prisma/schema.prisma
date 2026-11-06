@@ -1,0 +1,1008 @@
+// SENTINEL RESEARCH
+// Prisma schema
+//
+// Source of truth for structure:
+//   docs/DATABASE-SCHEMA.md as amended by docs/DECISIONS.md (ADR-001 to ADR-022).
+//
+// Conventions:
+//   - UUID primary keys.
+//   - Workspace is the tenancy root.
+//   - Research records are workspace-scoped even when inherited through a parent.
+//   - Evidence content lives in object storage, never in this database.
+//   - Constraint checks that Prisma cannot express are added in the migration SQL.
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Identity, tenancy, and membership
+// ---------------------------------------------------------------------------
+
+enum WorkspaceKind {
+  PERSONAL
+  TEAM
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  RESEARCHER
+  REVIEWER
+}
+
+enum ExperienceLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  PROFESSIONAL
+}
+
+enum PreferredMode {
+  GUIDED
+  DELEGATED
+  BOTH
+}
+
+enum ResearchInterest {
+  WEB_APPLICATION_SECURITY
+  BUG_BOUNTY_RESEARCH
+  PENETRATION_TESTING
+  API_SECURITY
+  SECURITY_EDUCATION
+}
+
+model User {
+  id                    String             @id @default(uuid()) @db.Uuid
+  authProviderId        String             @unique
+  email                 String             @unique
+  displayName           String
+  avatarUrl             String?
+  experienceLevel       ExperienceLevel    @default(BEGINNER)
+  preferredMode         PreferredMode      @default(GUIDED)
+  researchInterests     ResearchInterest[] @default([])
+  onboardingCompletedAt DateTime?
+  onboardingVersion     Int                @default(1)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  ownedWorkspaces        Workspace[]                @relation("WorkspaceOwner")
+  memberships            WorkspaceMember[]
+  ownedProjects          Project[]                  @relation("ProjectOwner")
+  createdInvestigations  Investigation[]            @relation("InvestigationCreator")
+  createdObservations    InvestigationObservation[] @relation("ObservationCreator")
+  createdHypotheses      Hypothesis[]               @relation("HypothesisCreator")
+  createdHypothesisLinks HypothesisObservation[]    @relation("HypothesisObservationCreator")
+  createdFindings        Finding[]                  @relation("FindingCreator")
+  approvedFindings       Finding[]                  @relation("FindingApprover")
+  assessedFindings       Finding[]                  @relation("SeverityAssessor")
+  confirmedDuplicates    Finding[]                  @relation("DuplicateConfirmer")
+  uploadedEvidence       Evidence[]                 @relation("EvidenceUploader")
+  reviewedEvidence       Evidence[]                 @relation("EvidenceRedactionReviewer")
+  providerConfigs        AIProviderConfig[]
+  requestedTasks         AITask[]                   @relation("AITaskRequester")
+  humanReviews           VerificationReview[]       @relation("HumanVerificationReviewer")
+  sessionSummaries       SessionSummary[]           @relation("SessionSummaryCreator")
+  createdScopeVersions   ScopeVersion[]             @relation("ScopeCreator")
+  approvedScopeVersions  ScopeVersion[]             @relation("ScopeApprover")
+  uploadedArtifacts      AuthorizationArtifact[]
+  createdReports         Report[]                   @relation("ReportCreator")
+  approvedReports        Report[]                   @relation("ReportApprover")
+  createdReportTemplates ReportTemplate[]
+  createdReportRevisions ReportRevision[]
+  auditLogs              AuditLog[]
+}
+
+model Workspace {
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String        @unique
+  kind        WorkspaceKind @default(PERSONAL)
+  ownerId     String        @db.Uuid
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  owner           User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members         WorkspaceMember[]
+  projects        Project[]
+  investigations  Investigation[]
+  findings        Finding[]
+  evidence        Evidence[]
+  conversations   AIConversation[]
+  aiTasks         AITask[]
+  reports         Report[]
+  reportTemplates ReportTemplate[]
+  auditLogs       AuditLog[]
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @db.Uuid
+  userId      String        @db.Uuid
+  role        WorkspaceRole @default(RESEARCHER)
+  joinedAt    DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Projects, targets, and scope
+// ---------------------------------------------------------------------------
+
+enum ProjectType {
+  LEARNING_LAB
+  BUG_BOUNTY
+  AUTHORIZED_ASSESSMENT
+  INTERNAL_RESEARCH
+}
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum AssetType {
+  DOMAIN
+  APPLICATION
+  API
+  IP_ASSET
+  LOCAL_LAB
+  OTHER
+}
+
+enum EnvironmentType {
+  PRACTICE_LAB
+  BUG_BOUNTY_PROGRAM
+  AUTHORIZED_ASSESSMENT
+  INTERNAL_ENVIRONMENT
+}
+
+enum TargetAuthorizationStatus {
+  PENDING
+  AUTHORIZED
+  EXPIRED
+  REVOKED
+  UNVERIFIED
+}
+
+enum ScopeStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+  EXPIRED
+  REVOKED
+}
+
+enum ScopeAssetMatchType {
+  EXACT
+  DOMAIN
+  SUBDOMAIN
+  CIDR
+  URL_PREFIX
+}
+
+enum ScopeAssetEffect {
+  ALLOWED
+  EXCLUDED
+}
+
+enum ScopeActivityEffect {
+  PERMITTED
+  PROHIBITED
+}
+
+enum Capability {
+  READ_PROJECT_CONTEXT
+  READ_INVESTIGATION_CONTEXT
+  AI_ANALYZE_SUPPLIED_CONTENT
+  AI_ANALYZE_TARGET_CONTEXT
+  EXPORT_REPORT
+  MODIFY_SCOPE
+  PASSIVE_FETCH
+  ACTIVE_TEST
+  BROWSE_WEB
+  EXECUTE_COMMAND
+  SUBMIT_EXTERNAL_REPORT
+}
+
+model Project {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @db.Uuid
+  ownerId     String        @db.Uuid
+  name        String
+  slug        String
+  description String?
+  projectType ProjectType   @default(LEARNING_LAB)
+  status      ProjectStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  archivedAt  DateTime?
+
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  owner          User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  targets        Target[]
+  investigations Investigation[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, status])
+}
+
+model Target {
+  id                     String                    @id @default(uuid()) @db.Uuid
+  projectId              String                    @db.Uuid
+  name                   String
+  description            String?
+  assetIdentifier        String
+  assetType              AssetType
+  environmentType        EnvironmentType
+  programName            String?
+  programUrl             String?
+  authorizationStatus    TargetAuthorizationStatus @default(UNVERIFIED)
+  authorizationSource    String?
+  authorizationDate      DateTime?
+  authorizationExpiresAt DateTime?
+  authorizationNotes     String?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  scopeVersions  ScopeVersion[]
+  investigations Investigation[]
+
+  @@unique([projectId, assetIdentifier])
+  @@index([projectId])
+  @@index([authorizationStatus])
+}
+
+model ScopeVersion {
+  id               String      @id @default(uuid()) @db.Uuid
+  targetId         String      @db.Uuid
+  version          Int
+  status           ScopeStatus @default(DRAFT)
+  attestationNotes String?
+  approvedBy       String?     @db.Uuid
+  approvedAt       DateTime?
+  supersededAt     DateTime?
+  effectiveFrom    DateTime?
+  effectiveUntil   DateTime?
+  createdBy        String      @db.Uuid
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  target     Target                  @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  creator    User                    @relation("ScopeCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  approver   User?                   @relation("ScopeApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
+  assets     ScopeAsset[]
+  activities ScopeActivityRule[]
+  artifacts  AuthorizationArtifact[]
+
+  @@unique([targetId, version])
+  @@index([targetId, status])
+}
+
+model ScopeAsset {
+  id              String              @id @default(uuid()) @db.Uuid
+  scopeVersionId  String              @db.Uuid
+  assetIdentifier String
+  assetType       AssetType
+  matchType       ScopeAssetMatchType @default(EXACT)
+  effect          ScopeAssetEffect
+  notes           String?
+  createdAt       DateTime            @default(now())
+
+  scopeVersion ScopeVersion @relation(fields: [scopeVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([scopeVersionId, assetIdentifier, matchType])
+  @@index([scopeVersionId])
+}
+
+model ScopeActivityRule {
+  id             String              @id @default(uuid()) @db.Uuid
+  scopeVersionId String              @db.Uuid
+  activity       Capability
+  effect         ScopeActivityEffect
+  createdAt      DateTime            @default(now())
+
+  scopeVersion ScopeVersion @relation(fields: [scopeVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([scopeVersionId, activity])
+  @@index([scopeVersionId])
+}
+
+model AuthorizationArtifact {
+  id             String   @id @default(uuid()) @db.Uuid
+  scopeVersionId String   @db.Uuid
+  storageKey     String   @unique
+  fileName       String
+  mimeType       String
+  fileSize       Int
+  checksum       String
+  uploadedBy     String   @db.Uuid
+  createdAt      DateTime @default(now())
+
+  scopeVersion ScopeVersion @relation(fields: [scopeVersionId], references: [id], onDelete: Cascade)
+  uploader     User         @relation(fields: [uploadedBy], references: [id], onDelete: Restrict)
+
+  @@index([scopeVersionId])
+}
+
+// ---------------------------------------------------------------------------
+// Investigations, observations, hypotheses, and findings
+// ---------------------------------------------------------------------------
+
+enum InvestigationStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  UNDER_REVIEW
+  COMPLETED
+  ARCHIVED
+}
+
+enum ObservationType {
+  APPLICATION_BEHAVIOUR
+  ROUTE_INFORMATION
+  HTTP_METADATA
+  USER_NOTE
+  AI_OBSERVATION
+  OTHER
+}
+
+enum ConfidenceLabel {
+  UNKNOWN
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum HypothesisStatus {
+  IDEA
+  OBSERVED
+  NEEDS_VALIDATION
+  CONFIRMED
+  NOT_REPRODUCIBLE
+  REJECTED
+}
+
+enum HypothesisObservationRelationship {
+  SUPPORTS
+  CONTRADICTS
+  CONTEXT
+}
+
+enum FindingStatus {
+  DRAFT
+  NEEDS_VALIDATION
+  UNDER_REVIEW
+  CONFIRMED
+  FALSE_POSITIVE
+  REJECTED
+  REPORTABLE
+  CLOSED
+}
+
+enum Severity {
+  INFORMATIONAL
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  UNASSESSED
+}
+
+enum ResolutionReason {
+  DUPLICATE
+  OUT_OF_SCOPE
+  INSUFFICIENT_EVIDENCE
+  OTHER
+}
+
+model Investigation {
+  id          String              @id @default(uuid()) @db.Uuid
+  workspaceId String              @db.Uuid
+  projectId   String              @db.Uuid
+  targetId    String              @db.Uuid
+  title       String
+  description String?
+  objective   String?
+  category    String?
+  status      InvestigationStatus @default(DRAFT)
+  createdBy   String              @db.Uuid
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  workspace        Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  project          Project                    @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  target           Target                     @relation(fields: [targetId], references: [id], onDelete: Restrict)
+  creator          User                       @relation("InvestigationCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  observations     InvestigationObservation[]
+  hypotheses       Hypothesis[]
+  findings         Finding[]
+  evidence         Evidence[]
+  conversations    AIConversation[]
+  aiTasks          AITask[]
+  sessionSummaries SessionSummary[]
+  reports          Report[]
+
+  @@index([workspaceId, status])
+  @@index([projectId, status])
+  @@index([targetId])
+}
+
+model InvestigationObservation {
+  id              String          @id @default(uuid()) @db.Uuid
+  investigationId String          @db.Uuid
+  title           String
+  description     String
+  observationType ObservationType
+  source          String?
+  confidenceLabel ConfidenceLabel @default(UNKNOWN)
+  createdBy       String          @db.Uuid
+  createdAt       DateTime        @default(now())
+
+  investigation   Investigation           @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  creator         User                    @relation("ObservationCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  hypothesisLinks HypothesisObservation[]
+
+  @@index([investigationId, createdAt])
+}
+
+model Hypothesis {
+  id                    String           @id @default(uuid()) @db.Uuid
+  investigationId       String           @db.Uuid
+  title                 String
+  description           String
+  vulnerabilityCategory String?
+  missingInformation    String?
+  status                HypothesisStatus @default(IDEA)
+  createdBy             String           @db.Uuid
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  investigation    Investigation           @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  creator          User                    @relation("HypothesisCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  observationLinks HypothesisObservation[]
+  findings         Finding[]
+
+  @@index([investigationId, status])
+}
+
+model HypothesisObservation {
+  id               String                            @id @default(uuid()) @db.Uuid
+  hypothesisId     String                            @db.Uuid
+  observationId    String                            @db.Uuid
+  relationshipType HypothesisObservationRelationship
+  createdBy        String                            @db.Uuid
+  createdAt        DateTime                          @default(now())
+
+  hypothesis  Hypothesis               @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  observation InvestigationObservation @relation(fields: [observationId], references: [id], onDelete: Restrict)
+  creator     User                     @relation("HypothesisObservationCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@unique([hypothesisId, observationId])
+  @@index([observationId])
+}
+
+model Finding {
+  id                    String            @id @default(uuid()) @db.Uuid
+  workspaceId           String            @db.Uuid
+  investigationId       String            @db.Uuid
+  hypothesisId          String?           @db.Uuid
+  title                 String
+  titleNormalized       String
+  description           String
+  vulnerabilityCategory String?
+  severity              Severity          @default(UNASSESSED)
+  severityRationale     String?
+  severityAssessedBy    String?           @db.Uuid
+  severityAssessedAt    DateTime?
+  affectedAsset         String?
+  affectedAssetType     AssetType?
+  status                FindingStatus     @default(DRAFT)
+  resolutionReason      ResolutionReason?
+  impact                String?
+  remediation           String?
+  verifiedAt            DateTime?
+  createdBy             String            @db.Uuid
+  approvedBy            String?           @db.Uuid
+  approvedAt            DateTime?
+  duplicateOfId         String?           @db.Uuid
+  duplicateConfirmedBy  String?           @db.Uuid
+  duplicateConfirmedAt  DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  workspace           Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  investigation       Investigation        @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  hypothesis          Hypothesis?          @relation(fields: [hypothesisId], references: [id], onDelete: SetNull)
+  creator             User                 @relation("FindingCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  approver            User?                @relation("FindingApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
+  severityAssessor    User?                @relation("SeverityAssessor", fields: [severityAssessedBy], references: [id], onDelete: SetNull)
+  duplicateConfirmer  User?                @relation("DuplicateConfirmer", fields: [duplicateConfirmedBy], references: [id], onDelete: SetNull)
+  duplicateOf         Finding?             @relation("FindingDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates          Finding[]            @relation("FindingDuplicates")
+  evidenceLinks       EvidenceLink[]
+  verificationReviews VerificationReview[]
+  reportFindings      ReportFinding[]
+
+  @@index([workspaceId, status])
+  @@index([investigationId, status])
+  @@index([investigationId, vulnerabilityCategory])
+  @@index([duplicateOfId])
+  @@index([titleNormalized(ops: raw("gin_trgm_ops"))], type: Gin, map: "Finding_titleNormalized_trgm_idx")
+}
+
+// ---------------------------------------------------------------------------
+// Evidence
+// ---------------------------------------------------------------------------
+
+enum EvidenceType {
+  SCREENSHOT
+  HTTP_REQUEST
+  HTTP_RESPONSE
+  TEXT_OBSERVATION
+  DOCUMENT
+  LOG
+  EXTERNAL_REFERENCE
+  REPRODUCTION_NOTE
+  OTHER
+}
+
+enum EvidenceLinkRelationship {
+  SUPPORTS
+  CONTRADICTS
+  CONTEXT
+  REPRODUCTION
+}
+
+enum RedactionStatus {
+  NOT_REVIEWED
+  QUARANTINED
+  REDACTED
+  VERIFIED_SAFE
+}
+
+enum RedactionMethod {
+  NONE
+  CLIENT_MASK
+  HUMAN_REVIEW
+}
+
+model Evidence {
+  id                  String          @id @default(uuid()) @db.Uuid
+  workspaceId         String          @db.Uuid
+  investigationId     String          @db.Uuid
+  evidenceType        EvidenceType
+  title               String
+  description         String?
+  fileName            String
+  storageKey          String?         @unique
+  quarantineKey       String?         @unique
+  mimeType            String
+  fileSize            Int
+  checksum            String
+  source              String?
+  redactionStatus     RedactionStatus @default(NOT_REVIEWED)
+  redactionMethod     RedactionMethod @default(NONE)
+  scanFindings        Json?
+  uploadedBy          String          @db.Uuid
+  redactionReviewedBy String?         @db.Uuid
+  redactionReviewedAt DateTime?
+  activatedAt         DateTime?
+  version             Int             @default(1)
+  supersedesId        String?         @db.Uuid
+  deletedAt           DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  workspace         Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  investigation     Investigation  @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  uploader          User           @relation("EvidenceUploader", fields: [uploadedBy], references: [id], onDelete: Restrict)
+  redactionReviewer User?          @relation("EvidenceRedactionReviewer", fields: [redactionReviewedBy], references: [id], onDelete: SetNull)
+  supersedes        Evidence?      @relation("EvidenceVersions", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy      Evidence[]     @relation("EvidenceVersions")
+  links             EvidenceLink[]
+
+  @@index([investigationId])
+  @@index([workspaceId, redactionStatus])
+  @@index([supersedesId])
+}
+
+model EvidenceLink {
+  id               String                   @id @default(uuid()) @db.Uuid
+  evidenceId       String                   @db.Uuid
+  findingId        String                   @db.Uuid
+  relationshipType EvidenceLinkRelationship
+  createdAt        DateTime                 @default(now())
+
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  finding  Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  @@unique([evidenceId, findingId, relationshipType])
+  @@index([findingId])
+}
+
+// ---------------------------------------------------------------------------
+// AI
+// ---------------------------------------------------------------------------
+
+enum AIProvider {
+  ANTHROPIC
+}
+
+enum AIConversationMode {
+  GUIDED
+  DELEGATED
+}
+
+enum AIConversationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum AIMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum AITaskType {
+  RECON_ANALYSIS
+  ATTACK_SURFACE_ANALYSIS
+  HYPOTHESIS_GENERATION
+  EVIDENCE_REVIEW
+  FALSE_POSITIVE_REVIEW
+  FINDING_SUMMARY
+  REPORT_GENERATION
+  SESSION_SUMMARY
+}
+
+enum AITaskStatus {
+  PENDING
+  RUNNING
+  AWAITING_APPROVAL
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMED_OUT
+}
+
+enum AITaskEventType {
+  TASK_CREATED
+  PERMISSION_CHECK
+  CONTEXT_ASSEMBLY
+  TASK_ASSIGNMENT
+  AI_PROCESSING
+  OUTPUT_VALIDATION
+  RESULT_STORAGE
+  HUMAN_REVIEW
+  TASK_COMPLETED
+  TASK_FAILED
+  TASK_CANCELLED
+  TASK_TIMED_OUT
+}
+
+enum ReviewerType {
+  AI
+  HUMAN
+}
+
+enum VerificationConclusion {
+  NEEDS_MORE_EVIDENCE
+  NOT_REPRODUCIBLE
+  FALSE_POSITIVE
+  REVIEW_SUPPORTS_CONFIRMATION
+  CONFIRMED
+  REJECTED
+}
+
+enum SummaryAuthorType {
+  AI
+  HUMAN
+}
+
+model AIProviderConfig {
+  id                           String     @id @default(uuid()) @db.Uuid
+  userId                       String     @db.Uuid
+  provider                     AIProvider
+  displayName                  String?
+  encryptedCredentialReference String?
+  defaultModel                 String?
+  isActive                     Boolean    @default(true)
+  createdAt                    DateTime   @default(now())
+  updatedAt                    DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+}
+
+model AIConversation {
+  id              String               @id @default(uuid()) @db.Uuid
+  workspaceId     String               @db.Uuid
+  investigationId String               @db.Uuid
+  title           String
+  mode            AIConversationMode   @default(GUIDED)
+  provider        AIProvider
+  model           String
+  status          AIConversationStatus @default(ACTIVE)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  investigation Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  messages      AIMessage[]
+  tasks         AITask[]
+
+  @@index([investigationId])
+  @@index([workspaceId])
+}
+
+model AIMessage {
+  id                String        @id @default(uuid()) @db.Uuid
+  conversationId    String        @db.Uuid
+  role              AIMessageRole
+  content           String
+  structuredContent Json?
+  inputTokens       Int?
+  outputTokens      Int?
+  createdAt         DateTime      @default(now())
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model AITask {
+  id                   String       @id @default(uuid()) @db.Uuid
+  workspaceId          String       @db.Uuid
+  investigationId      String       @db.Uuid
+  conversationId       String?      @db.Uuid
+  taskType             AITaskType
+  status               AITaskStatus @default(PENDING)
+  assignedRole         String?
+  inputContext         Json?
+  output               Json?
+  errorMessage         String?
+  failureCode          String?
+  provider             AIProvider
+  model                String
+  promptTemplateId     String
+  promptVersion        String
+  contextVersion       String
+  idempotencyKey       String
+  requiredCapabilities Capability[] @default([])
+  inputTokenBudget     Int
+  outputTokenBudget    Int
+  inputTokens          Int          @default(0)
+  outputTokens         Int          @default(0)
+  estimatedCostUsd     Decimal      @default(0) @db.Decimal(12, 6)
+  correlationId        String?
+  requestedBy          String       @db.Uuid
+  parentTaskId         String?      @db.Uuid
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  workspace           Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  investigation       Investigation        @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  conversation        AIConversation?      @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  requester           User                 @relation("AITaskRequester", fields: [requestedBy], references: [id], onDelete: Restrict)
+  parentTask          AITask?              @relation("AITaskRetries", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  retries             AITask[]             @relation("AITaskRetries")
+  events              AITaskEvent[]
+  verificationReviews VerificationReview[]
+  sessionSummaries    SessionSummary[]     @relation("SessionSummarySourceTask")
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, status])
+  @@index([investigationId, status])
+  @@index([conversationId])
+  @@index([correlationId])
+  @@index([parentTaskId])
+}
+
+model AITaskEvent {
+  id          String          @id @default(uuid()) @db.Uuid
+  taskId      String          @db.Uuid
+  eventType   AITaskEventType
+  description String?
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+
+  task AITask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+}
+
+model VerificationReview {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  findingId             String                 @db.Uuid
+  taskId                String?                @db.Uuid
+  reviewerType          ReviewerType
+  reviewerUserId        String?                @db.Uuid
+  conclusion            VerificationConclusion
+  supportingEvidence    Json?
+  contradictingEvidence Json?
+  missingEvidence       Json?
+  impactAssessment      String?
+  reasoningSummary      String?
+  createdAt             DateTime               @default(now())
+
+  finding  Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  task     AITask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  reviewer User?   @relation("HumanVerificationReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull)
+
+  @@index([findingId])
+  @@index([taskId])
+}
+
+model SessionSummary {
+  id                  String            @id @default(uuid()) @db.Uuid
+  investigationId     String            @db.Uuid
+  summary             String
+  completedWork       Json?
+  rejectedHypotheses  Json?
+  unresolvedQuestions Json?
+  nextActions         Json?
+  generatedByType     SummaryAuthorType
+  model               String?
+  promptVersion       String?
+  sourceTaskId        String?           @db.Uuid
+  createdBy           String?           @db.Uuid
+  createdAt           DateTime          @default(now())
+
+  investigation Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  sourceTask    AITask?       @relation("SessionSummarySourceTask", fields: [sourceTaskId], references: [id], onDelete: SetNull)
+  creator       User?         @relation("SessionSummaryCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([investigationId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Reports
+// ---------------------------------------------------------------------------
+
+enum ReportStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  EXPORTED
+  ARCHIVED
+}
+
+enum ReportFormat {
+  MARKDOWN
+  PDF
+}
+
+enum ReportGenerationSource {
+  HUMAN
+  AI_ASSISTED
+}
+
+enum ReportTemplateScope {
+  SYSTEM
+  WORKSPACE
+}
+
+model Report {
+  id              String       @id @default(uuid()) @db.Uuid
+  workspaceId     String       @db.Uuid
+  investigationId String       @db.Uuid
+  templateId      String?      @db.Uuid
+  title           String
+  status          ReportStatus @default(DRAFT)
+  format          ReportFormat @default(MARKDOWN)
+  createdBy       String       @db.Uuid
+  approvedBy      String?      @db.Uuid
+  approvedAt      DateTime?
+  archivedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  investigation Investigation    @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  template      ReportTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  creator       User             @relation("ReportCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  approver      User?            @relation("ReportApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
+  findings      ReportFinding[]
+  revisions     ReportRevision[]
+
+  @@index([workspaceId, status])
+  @@index([investigationId, status])
+}
+
+model ReportFinding {
+  id        String @id @default(uuid()) @db.Uuid
+  reportId  String @db.Uuid
+  findingId String @db.Uuid
+  position  Int
+
+  report  Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  finding Finding @relation(fields: [findingId], references: [id], onDelete: Restrict)
+
+  @@unique([reportId, findingId])
+  @@index([findingId])
+}
+
+model ReportTemplate {
+  id            String              @id @default(uuid()) @db.Uuid
+  workspaceId   String?             @db.Uuid
+  name          String
+  version       Int                 @default(1)
+  scope         ReportTemplateScope @default(WORKSPACE)
+  sectionSchema Json
+  isActive      Boolean             @default(true)
+  createdBy     String?             @db.Uuid
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator   User?      @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  reports   Report[]
+
+  @@unique([workspaceId, name, version])
+  @@index([name, version])
+}
+
+model ReportRevision {
+  id               String                 @id @default(uuid()) @db.Uuid
+  reportId         String                 @db.Uuid
+  version          Int
+  content          String
+  evidenceSnapshot Json
+  findingSnapshot  Json
+  generatedByType  ReportGenerationSource
+  model            String?
+  promptVersion    String?
+  createdBy        String?                @db.Uuid
+  createdAt        DateTime               @default(now())
+
+  report  Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  creator User?  @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@unique([reportId, version])
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  workspaceId   String?  @db.Uuid
+  userId        String?  @db.Uuid
+  action        String
+  entityType    String
+  entityId      String?
+  previousValue Json?
+  newValue      Json?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([entityType, entityId])
+  @@index([userId, createdAt])
+}
