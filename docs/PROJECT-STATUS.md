@@ -4,15 +4,17 @@ Updated: 6 November 2026.
 
 ## Current stage
 
-Phase 6 (Evidence and Findings) and the reports v1 module are implemented across the domain,
+Phase 6 (Evidence and Findings) and the reports module are implemented across the domain,
 persistence, application, API, and UI layers, following ADR-004, ADR-005, ADR-008, ADR-013, ADR-015,
-ADR-016, ADR-019, and ADR-026. The source documents now record the evidence, quarantine, storage,
-upload, and report amendments from ADR-004, ADR-008, ADR-013, and ADR-019.
+ADR-016, ADR-019, ADR-026, and ADR-027. The source documents now record the evidence, quarantine,
+storage, upload, report, PDF, and template amendments from ADR-004, ADR-008, ADR-013, ADR-019, and
+ADR-027.
 
 Phase 5 (AI Integration) remains complete for the investigation AI workspace:
 `TECHNICAL-ARCHITECTURE.md` §20, `AI-ARCHITECTURE.md`, and ADR-025. AI remains advisory and cannot
-confirm findings, set severity, change scope, authorize targets, or mark findings reportable. Reports
-v1 is human-authored and does not call AI.
+confirm findings, set severity, change scope, authorize targets, or mark findings reportable. Approved
+text evidence is now supplied to AI tasks as untrusted context; binary evidence contributes metadata
+only. Reports are human-authored and do not call AI.
 
 The older implementation plan uses different phase numbering; accepted decisions take precedence.
 
@@ -45,23 +47,34 @@ workspace at `/dashboard/investigations/[investigationId]/ai`. Reports are live 
   investigation or a confirmed finding, and investigation/finding pages link into it.
 - The detail page shows status guidance, report context, current Markdown, included findings,
   evidence references, and the full revision history.
-- Export is a Server Action that audits `REPORT_EXPORTED`, moves an approved report to `EXPORTED`,
-  and redirects to `GET /api/reports/[reportId]/export`. The route returns Markdown with a safe
-  filename and is also available for re-download while the report remains exported. GET never mutates
+- Export is a Server Action that audits `REPORT_EXPORTED` with the chosen format, moves an approved
+  report to `EXPORTED`, and redirects to `GET /api/reports/[reportId]/export` (`?format=pdf` for PDF).
+  Markdown and PDF re-downloads are available while the report remains exported. GET never mutates
   report state.
+- PDF export is a deterministic server-side Markdown renderer using `pdf-lib` (ADR-027). It supports
+  headings, paragraphs, lists, blockquotes, code blocks, A4 pagination, document metadata, and page
+  footers. It does not call AI or a browser worker, and Markdown remains canonical.
+- Report templates are exposed at `/dashboard/reports/templates`. System templates are seeded by
+  migration and read-only; workspace templates are created and activated or deactivated by `OWNER`
+  or `ADMIN`. Saving the same name creates the next version.
+- Every template must keep summary, findings, evidence references, assumptions, and missing
+  information sections. Templates may add methodology and recommendations and control section order.
+  Report creation accepts an active system or workspace template, and saved revisions remain immutable
+  when a template changes.
 - Report mutations write allow-listed audit events: `REPORT_CREATED`, `REPORT_REVISION_SAVED`,
-  `REPORT_STATUS_CHANGED`, and `REPORT_EXPORTED`.
-- Unit tests cover status transitions, reviewer roles, readiness, Markdown rendering, validation, and
-  filename generation. Integration tests cover creation, revision, submit, reviewer-only approval,
-  export, archive, archived-project rejection, readiness regression, and reopening.
+  `REPORT_STATUS_CHANGED`, `REPORT_EXPORTED`, `REPORT_TEMPLATE_CREATED`, and
+  `REPORT_TEMPLATE_UPDATED`.
+- Unit tests cover status transitions, reviewer roles, readiness, Markdown rendering, template
+  schemas, PDF output, validation, and filename generation. Integration tests cover creation,
+  revision, submit, reviewer-only approval, Markdown and PDF export, template creation/versioning and
+  deactivation, archive, archived-project rejection, readiness regression, and reopening.
 
 ### Remaining report gaps
 
-- Markdown is the only implemented export. PDF remains undecided (M-37).
-- The `ReportTemplate` model exists, but template selection and workspace/system template management
-  are not exposed in the UI. Reports v1 uses the built-in section schema.
-- Reports snapshot approved evidence metadata and the Markdown content at revision time; rendering
-  embedded evidence files into the export is not implemented.
+- Reports snapshot approved evidence metadata and the revision content; rendering embedded evidence
+  files into the Markdown or PDF export is not implemented.
+- PDF rendering is intentionally basic and uses standard PDF fonts, so non-Latin glyph support is
+  limited until a font-embedding strategy is adopted.
 
 ## Phase 6 — Evidence and findings
 
@@ -169,6 +182,10 @@ workspace at `/dashboard/investigations/[investigationId]/ai`. Reports are live 
   Anthropic tool use with Zod re-validation and one corrective retry, versioned hashed prompts,
   context compression, per-task budgets, a rolling 24-hour 250,000-token user cap, SSE chat, and a
   deterministic mock provider. Archived investigations reject new AI tasks.
+- AI context now includes approved evidence (`REDACTED` or `VERIFIED_SAFE`). Text-like evidence up
+  to 512 KB is read through `EvidenceStorage`, bounded per task, and labelled as untrusted data.
+  Binary evidence contributes metadata only, storage failures degrade to metadata, and each task
+  records the included evidence IDs and versions in `inputContext` and its context event.
 - Phase 4 investigations: lifecycle, observations, hypotheses and links, manual summaries, audits,
   and project-scoped lists.
 - Phase 3 projects, targets, and scope management, including self-attested activation, revocation,
@@ -179,15 +196,12 @@ workspace at `/dashboard/investigations/[investigationId]/ai`. Reports are live 
 
 ## Next implementation work
 
-1. Wire approved evidence text (never raw binaries or quarantine content) into AI context and record
-   the evidence IDs and versions used per task (ADR-013 §10).
-2. Complete the end-to-end AI verification assistant: run a verification task against a finding,
+1. Complete the end-to-end AI verification assistant: run a verification task against a finding,
    persist the AI review with its split vocabulary, and show it beside the human review.
-3. Expose evidence supersession so a correction creates a new `version` with `supersedesId` instead
+2. Expose evidence supersession so a correction creates a new `version` with `supersedesId` instead
    of requiring a fresh unlinked record (ADR-004).
-4. Expose report template selection and management, then seed system templates (ADR-008 follow-up).
-5. Apply the remaining source-document amendments for ADR-025 and earlier ADRs when those documents
-   are next revised.
+3. Apply the remaining source-document amendments for ADR-024, ADR-025, and earlier ADRs when those
+   documents are next revised.
 
 ## Open decisions and known gaps
 
@@ -196,18 +210,13 @@ workspace at `/dashboard/investigations/[investigationId]/ai`. Reports are live 
 - **M-30 malware scanning:** deferred for the MVP. Compensating controls are the MIME allowlist,
   magic-byte validation, size limits, private storage, signed downloads, quarantine, and a human
   review. This must be revisited before public or multi-tenant launch.
-- **M-37 PDF export:** the report export format and renderer remain undecided.
 - **M-38 region and data residency:** the Neon/Vercel region is recorded at deployment and remains
   subject to this decision.
-- **AI evidence context:** approved evidence is not yet included in AI context. This is safe by
-  omission, but the verification assistant is not end-to-end until it is wired.
 - **Image redaction UI:** text evidence can be edited before upload, but the image masking/blackout
   step described in ADR-013 §3 is not implemented yet. Server checks and human review remain
   mandatory.
 - **Evidence versioning UI:** the schema and keys support versions, but the creation flow for a
   superseding version is not exposed yet.
-- **Report templates:** the model exists, but template selection and workspace/system template
-  management are not exposed. Reports v1 uses the built-in Markdown section schema.
 - **Onboarding:** deferred under ADR-023. First authenticated access provisions the workspace.
 - **Background Clerk synchronization:** requires a configured signing secret; the lazy
   `getSessionContext()` fallback covers missed webhooks.

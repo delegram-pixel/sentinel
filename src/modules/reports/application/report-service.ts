@@ -656,9 +656,7 @@ async function buildReportExport(
     format,
     contentType: reportExportContentType(format),
     body:
-      format === "PDF"
-        ? await renderReportPdf(revision.content, report.title)
-        : revision.content,
+      format === "PDF" ? await renderReportPdf(revision.content, report.title) : revision.content,
   };
 }
 

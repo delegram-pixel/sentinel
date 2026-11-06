@@ -4,11 +4,14 @@ import {
   approveReport,
   archiveReport,
   createReport,
+  createReportTemplate,
   exportReport,
   getReport,
+  listReportTemplates,
   readReportExport,
   reopenReport,
   saveReportRevision,
+  setReportTemplateActive,
   submitReport,
 } from "@/modules/reports/application/report-service";
 import { PrismaReportStore } from "@/modules/reports/infrastructure/prisma-report-store";
@@ -142,13 +145,24 @@ describe("report lifecycle", () => {
         return null;
       }
       expect(exported.value.fileName).toBe("search-review-report.md");
-      expect(exported.value.content).toContain("Human-written summary.");
+      expect(exported.value.format).toBe("MARKDOWN");
+      expect(String(exported.value.body)).toContain("Human-written summary.");
 
       const exportedReport = await getReport(store, tenancy.workspace.id, created.value.id);
       expect(exportedReport?.status).toBe("EXPORTED");
 
       const readable = await readReportExport(store, tenancy.workspace.id, created.value.id);
-      expect(readable?.content).toContain("Human-written summary.");
+      expect(String(readable?.body)).toContain("Human-written summary.");
+
+      const pdf = await readReportExport(store, tenancy.workspace.id, created.value.id, "PDF");
+      expect(pdf?.fileName).toBe("search-review-report.pdf");
+      expect(pdf?.contentType).toBe("application/pdf");
+      expect(pdf?.body).toBeInstanceOf(Uint8Array);
+      expect(
+        Buffer.from(pdf?.body ?? [])
+          .subarray(0, 5)
+          .toString("latin1"),
+      ).toBe("%PDF-");
 
       const archived = await archiveReport(store, actor(tenancy), created.value.id);
       expect(archived.ok).toBe(true);
@@ -271,5 +285,121 @@ describe("report lifecycle", () => {
     expect(result?.status).toBe("DRAFT");
     expect(result?.revisions).toHaveLength(1);
     expect(result?.approvedAt).toBeNull();
+  });
+
+  it("creates versioned workspace templates and uses them for new reports", async () => {
+    const result = await withRollback(client, async (tx) => {
+      const tenancy = await seedConfirmedFinding(tx);
+      const store = new PrismaReportStore(tx);
+      const systemTemplates = await listReportTemplates(store, tenancy.workspace.id, {
+        activeOnly: true,
+      });
+
+      const created = await createReportTemplate(store, actor(tenancy), {
+        name: "Internal assessment report",
+        sectionIds: [
+          "summary",
+          "findings",
+          "evidence",
+          "assumptions",
+          "missing-information",
+          "methodology",
+          "recommendations",
+        ],
+      });
+
+      if (!created.ok) {
+        return created;
+      }
+
+      const versionTwo = await createReportTemplate(store, actor(tenancy), {
+        name: "Internal assessment report",
+        sectionIds: [
+          "summary",
+          "findings",
+          "evidence",
+          "assumptions",
+          "missing-information",
+          "methodology",
+        ],
+      });
+
+      const report = await createReport(store, actor(tenancy), {
+        investigationId: tenancy.investigation.id,
+        title: "Templated report",
+        templateId: created.value.id,
+        findingIds: [tenancy.finding.id],
+      });
+
+      if (!report.ok) {
+        return report;
+      }
+
+      const detail = await getReport(store, tenancy.workspace.id, report.value.id);
+      return {
+        systemTemplateCount: systemTemplates.length,
+        versionTwoOk: versionTwo.ok,
+        detail,
+      };
+    });
+
+    expect(result && "ok" in result).toBe(false);
+    if (!result || "ok" in result) {
+      return;
+    }
+    expect(result.systemTemplateCount).toBeGreaterThanOrEqual(3);
+    expect(result.versionTwoOk).toBe(true);
+    expect(result.detail?.templateName).toBe("Internal assessment report");
+    expect(result.detail?.templateVersion).toBe(1);
+    expect(result.detail?.revisions[0]?.content).toContain("## Methodology");
+    expect(result.detail?.revisions[0]?.content).toContain("## Recommendations");
+  });
+
+  it("rejects inactive templates and template management by a researcher", async () => {
+    const result = await withRollback(client, async (tx) => {
+      const tenancy = await seedConfirmedFinding(tx);
+      const store = new PrismaReportStore(tx);
+      const created = await createReportTemplate(store, actor(tenancy), {
+        name: "Temporary template",
+        sectionIds: ["summary", "findings", "evidence", "assumptions", "missing-information"],
+      });
+
+      if (!created.ok) {
+        return created;
+      }
+
+      const deactivated = await setReportTemplateActive(
+        store,
+        actor(tenancy),
+        created.value.id,
+        false,
+      );
+      const selected = await createReport(store, actor(tenancy), {
+        investigationId: tenancy.investigation.id,
+        title: "Inactive template report",
+        templateId: created.value.id,
+        findingIds: [tenancy.finding.id],
+      });
+      const denied = await createReportTemplate(store, actor(tenancy, "RESEARCHER"), {
+        name: "Researcher template",
+        sectionIds: ["summary", "findings", "evidence", "assumptions", "missing-information"],
+      });
+
+      return { deactivated, selected, denied };
+    });
+
+    expect(result && "ok" in result).toBe(false);
+    if (!result || "ok" in result) {
+      return;
+    }
+    expect(result.deactivated.ok).toBe(true);
+    expect(result.selected.ok).toBe(false);
+    if (!result.selected.ok) {
+      expect(result.selected.code).toBe("REPORT_TEMPLATE_NOT_FOUND");
+    }
+    expect(result.denied.ok).toBe(false);
+    if (!result.denied.ok) {
+      expect(result.denied.code).toBe("FORBIDDEN_REPORT_ACTOR");
+    }
   });
 });

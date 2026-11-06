@@ -21,7 +21,7 @@ export async function GET(
     return new Response("This report is not available for export.", { status: 404 });
   }
 
-  return new Response(result.body, {
+  return new Response(result.body as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": result.contentType,

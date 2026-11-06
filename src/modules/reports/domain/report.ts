@@ -74,20 +74,19 @@ export const REQUIRED_REPORT_TEMPLATE_SECTION_IDS = [
   "missing-information",
 ] as const;
 
-const REPORT_TEMPLATE_SECTION_CATALOG: Record<ReportTemplateSectionId, ReportTemplateSection> =
-  {
-    summary: { id: "summary", title: "Summary", required: true },
-    findings: { id: "findings", title: "Findings", required: true },
-    evidence: { id: "evidence", title: "Evidence references", required: true },
-    assumptions: { id: "assumptions", title: "Assumptions and limitations", required: true },
-    "missing-information": {
-      id: "missing-information",
-      title: "Missing information",
-      required: true,
-    },
-    methodology: { id: "methodology", title: "Methodology", required: false },
-    recommendations: { id: "recommendations", title: "Recommendations", required: false },
-  };
+const REPORT_TEMPLATE_SECTION_CATALOG: Record<ReportTemplateSectionId, ReportTemplateSection> = {
+  summary: { id: "summary", title: "Summary", required: true },
+  findings: { id: "findings", title: "Findings", required: true },
+  evidence: { id: "evidence", title: "Evidence references", required: true },
+  assumptions: { id: "assumptions", title: "Assumptions and limitations", required: true },
+  "missing-information": {
+    id: "missing-information",
+    title: "Missing information",
+    required: true,
+  },
+  methodology: { id: "methodology", title: "Methodology", required: false },
+  recommendations: { id: "recommendations", title: "Recommendations", required: false },
+};
 
 export const REPORT_TEMPLATE_SECTIONS = [
   REPORT_TEMPLATE_SECTION_CATALOG.summary,
@@ -175,8 +174,7 @@ export const reportTemplateCreateSchema = z.object({
   sectionIds: z
     .array(z.enum(REPORT_TEMPLATE_SECTION_IDS))
     .refine(
-      (ids) =>
-        REQUIRED_REPORT_TEMPLATE_SECTION_IDS.every((requiredId) => ids.includes(requiredId)),
+      (ids) => REQUIRED_REPORT_TEMPLATE_SECTION_IDS.every((requiredId) => ids.includes(requiredId)),
       "Keep every required report section in the template.",
     ),
 });
@@ -264,11 +262,7 @@ function sectionTitle(
   );
 }
 
-function renderSummary(
-  lines: string[],
-  source: ReportSource,
-  title: string,
-): void {
+function renderSummary(lines: string[], source: ReportSource, title: string): void {
   lines.push(`## ${title}`, "");
   lines.push(
     `This report documents ${source.findings.length} confirmed or reportable finding${
@@ -315,11 +309,7 @@ function renderFindings(lines: string[], source: ReportSource, title: string): v
   });
 }
 
-function renderEvidenceReferences(
-  lines: string[],
-  source: ReportSource,
-  title: string,
-): void {
+function renderEvidenceReferences(lines: string[], source: ReportSource, title: string): void {
   lines.push(`## ${title}`, "");
   const allEvidence = source.findings.flatMap((finding) => finding.evidence);
   if (allEvidence.length === 0) {
@@ -347,11 +337,7 @@ function renderAssumptions(lines: string[], title: string): void {
   );
 }
 
-function renderMissingInformation(
-  lines: string[],
-  source: ReportSource,
-  title: string,
-): void {
+function renderMissingInformation(lines: string[], source: ReportSource, title: string): void {
   lines.push(`## ${title}`, "");
   const missing = source.findings.flatMap((finding) => {
     const gaps: string[] = [];
@@ -386,14 +372,12 @@ function renderMethodology(lines: string[], title: string): void {
   );
 }
 
-function renderRecommendations(
-  lines: string[],
-  source: ReportSource,
-  title: string,
-): void {
+function renderRecommendations(lines: string[], source: ReportSource, title: string): void {
   lines.push(`## ${title}`, "");
   for (const finding of source.findings) {
-    lines.push(`- **${escapeMarkdown(finding.title)}:** ${valueOrNotRecorded(finding.remediation)}`);
+    lines.push(
+      `- **${escapeMarkdown(finding.title)}:** ${valueOrNotRecorded(finding.remediation)}`,
+    );
   }
   lines.push("");
 }

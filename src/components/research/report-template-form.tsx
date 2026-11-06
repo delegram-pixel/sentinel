@@ -38,9 +38,7 @@ export function ReportTemplateForm() {
   );
   const formRef = useFormErrorFocus(state);
   const selected: readonly string[] =
-    state.status === "error"
-      ? state.values.sectionIds
-      : [...REQUIRED_REPORT_TEMPLATE_SECTION_IDS];
+    state.status === "error" ? state.values.sectionIds : [...REQUIRED_REPORT_TEMPLATE_SECTION_IDS];
 
   return (
     <form ref={formRef} action={formAction} aria-busy={pending} className="form-stack">

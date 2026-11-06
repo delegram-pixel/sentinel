@@ -222,7 +222,9 @@ const reportTemplateSelect = {
   updatedAt: true,
 } satisfies Prisma.ReportTemplateSelect;
 
-type ReportTemplateRecord = Prisma.ReportTemplateGetPayload<{ select: typeof reportTemplateSelect }>;
+type ReportTemplateRecord = Prisma.ReportTemplateGetPayload<{
+  select: typeof reportTemplateSelect;
+}>;
 
 function mapReportTemplate(record: ReportTemplateRecord): ReportTemplateRow {
   return {

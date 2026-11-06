@@ -318,7 +318,10 @@ Responsibilities:
 - Approved evidence references only.
 - Immutable revision history with finding and evidence snapshots.
 - Human approval before export.
-- Markdown export and report archiving.
+- Markdown and PDF export and report archiving.
+- Markdown is canonical; PDF is a deterministic server-side derived export (ADR-027).
+- System templates are seeded read-only; workspace templates are owner/administrator-managed,
+  versioned by name, and cannot remove the required report sections.
 - Revision history and status auditing.
 
 ---

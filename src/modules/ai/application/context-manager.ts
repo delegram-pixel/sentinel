@@ -222,7 +222,8 @@ export function serializeContext(
   }
 
   for (const evidence of selected.evidence) {
-    const hasTextContent = typeof evidence.textContent === "string" && evidence.textContent.length > 0;
+    const hasTextContent =
+      typeof evidence.textContent === "string" && evidence.textContent.length > 0;
 
     lines.push(
       block(

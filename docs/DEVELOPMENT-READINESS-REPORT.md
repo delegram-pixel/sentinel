@@ -407,7 +407,7 @@ The following choices are not made anywhere in the documentation, or are made am
 | M-34 | Observability tooling | "Error monitoring" required, no tool named | Sentry + structured logs (pino); Vercel analytics | Deployment |
 | M-35 | Secrets encryption for future BYOK | Schema says encrypted credential reference, no mechanism | Platform key via hosting secrets; BYOK later with AES-256-GCM and KMS-managed key | AI config |
 | M-36 | Node, Yarn, Next.js, Tailwind versions | "Yarn" is specified but not the major version; Tailwind/shadcn compatibility matters | Pin Node LTS, Yarn 4, current stable Next.js/Tailwind; record in `.tool-versions`/`packageManager` | Phase 1 |
-| M-37 | PDF export implementation | Required in PRD; no approach | HTML template rendered to PDF via Playwright worker, or `@react-pdf/renderer`; decide in Phase 6 | Reporting |
+| M-37 | PDF export implementation | Resolved by ADR-027 | Deterministic server-side `pdf-lib` Markdown renderer; Markdown remains canonical | Reporting |
 | M-38 | Environment/region and data residency | Research data may be sensitive | Choose region with counsel; document retention and residency | Deployment |
 | M-39 | Email provider purpose | Listed in TA external services, no feature requires it | Remove until a notification feature exists | Architecture |
 

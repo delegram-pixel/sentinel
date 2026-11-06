@@ -9,6 +9,7 @@ import {
   runAiTask,
   sendChatMessage,
 } from "@/modules/ai/application/task-service";
+import type { AIProvider } from "@/modules/ai/application/provider";
 import { PrismaAIStore } from "@/modules/ai/infrastructure/prisma-ai-store";
 
 import { createTestClient, withRollback } from "./helpers/database";
@@ -22,7 +23,7 @@ afterAll(async () => {
 
 function dependencies(
   store: PrismaAIStore,
-  provider = new MockAIProvider(),
+  provider: AIProvider = new MockAIProvider(),
 ): AiServiceDependencies {
   return {
     store,
@@ -97,6 +98,97 @@ describe("AI task service", () => {
           "TASK_COMPLETED",
         ]),
       );
+    });
+  });
+
+  it("adds approved text evidence to AI context and records its version", async () => {
+    await withRollback(client, async (tx) => {
+      const tenancy = await createTenancy(tx);
+      const store = new PrismaAIStore(tx);
+      const textEvidence = await tx.evidence.create({
+        data: {
+          workspaceId: tenancy.workspace.id,
+          investigationId: tenancy.investigation.id,
+          evidenceType: "LOG",
+          title: "Export proxy log",
+          fileName: "export.log",
+          storageKey: `evidence/${tenancy.workspace.id}/${tenancy.investigation.id}/export-log-v2`,
+          mimeType: "text/plain",
+          fileSize: 128,
+          checksum: "d".repeat(64),
+          redactionStatus: "REDACTED",
+          redactionMethod: "HUMAN_REVIEW",
+          uploadedBy: tenancy.user.id,
+          activatedAt: tenancy.now,
+          version: 2,
+        },
+      });
+      const binaryEvidence = await tx.evidence.create({
+        data: {
+          workspaceId: tenancy.workspace.id,
+          investigationId: tenancy.investigation.id,
+          evidenceType: "SCREENSHOT",
+          title: "Export response screenshot",
+          fileName: "export.png",
+          storageKey: `evidence/${tenancy.workspace.id}/${tenancy.investigation.id}/export-v1`,
+          mimeType: "image/png",
+          fileSize: 2048,
+          checksum: "e".repeat(64),
+          redactionStatus: "VERIFIED_SAFE",
+          redactionMethod: "HUMAN_REVIEW",
+          uploadedBy: tenancy.user.id,
+          activatedAt: tenancy.now,
+        },
+      });
+      const requestedKeys: string[] = [];
+      let capturedSystem = "";
+      const provider: AIProvider = {
+        name: "MOCK",
+        async generate(request) {
+          capturedSystem = request.system;
+          return new MockAIProvider().generate(request);
+        },
+      };
+
+      const result = await runAiTask(
+        {
+          ...dependencies(store, provider),
+          evidenceStorage: {
+            async getObject(key) {
+              requestedKeys.push(key);
+
+              if (key === textEvidence.storageKey) {
+                return {
+                  body: Buffer.from("GET /account/export HTTP/1.1\nAuthorization: Bearer redacted"),
+                  contentType: "text/plain",
+                };
+              }
+
+              return null;
+            },
+          },
+        },
+        { userId: tenancy.user.id, workspaceId: tenancy.workspace.id },
+        { investigationId: tenancy.investigation.id, taskType: "RECON_ANALYSIS" },
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(requestedKeys).toEqual([textEvidence.storageKey]);
+      expect(capturedSystem).toContain(textEvidence.id);
+      expect(capturedSystem).toContain("GET /account/export");
+      expect(capturedSystem).toContain(binaryEvidence.id);
+      expect(capturedSystem).toContain("No text content is included");
+      expect(result.value.task.inputContext).toMatchObject({
+        included: { evidence: 2 },
+        evidence: expect.arrayContaining([
+          { id: textEvidence.id, version: 2 },
+          { id: binaryEvidence.id, version: 1 },
+        ]),
+      });
     });
   });
 

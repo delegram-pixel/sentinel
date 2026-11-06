@@ -87,12 +87,7 @@ function splitLongToken(token: string, font: PDFFont, size: number, maxWidth: nu
   return pieces;
 }
 
-function wrapText(
-  text: string,
-  font: PDFFont,
-  size: number,
-  maxWidth: number,
-): string[] {
+function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
   const normalized = text.replace(/\s+/g, " ").trim();
 
   if (!normalized) {

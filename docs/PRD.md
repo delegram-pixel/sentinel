@@ -299,8 +299,8 @@ Features:
 - Evidence references.
 - Impact explanation.
 - Remediation suggestions.
-- Markdown export.
-- PDF export.
+- Markdown export (canonical).
+- PDF export (derived, basic server-side rendering; ADR-027).
 - Report revision history.
 
 Reports must distinguish verified observations from assumptions.

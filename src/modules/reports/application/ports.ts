@@ -177,10 +177,7 @@ export type ReportStore = {
     workspaceId: string,
     options?: { activeOnly?: boolean },
   ): Promise<ReportTemplateRow[]>;
-  findReportTemplate(
-    workspaceId: string,
-    templateId: string,
-  ): Promise<ReportTemplateRow | null>;
+  findReportTemplate(workspaceId: string, templateId: string): Promise<ReportTemplateRow | null>;
   createReportTemplate(
     data: ReportTemplateCreateData,
     audit: ReportAuditDraft,

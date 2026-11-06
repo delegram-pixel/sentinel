@@ -3,7 +3,7 @@
 
 **Purpose:** Records product and architecture decisions that the source documents leave open or contradict. Source documents are not edited silently; each ADR lists the amendments required once the decision is ratified.
 
-**Status:** Ten blocking decisions, the seven schema-pack decisions, and the five platform decisions accepted on 3 November 2026. The AI execution pack was accepted on 6 November 2026 as ADR-025. Source-document amendments remain outstanding for most ADRs; the ADR-004, ADR-008, ADR-013, and ADR-019 amendments were applied on 6 November 2026.
+**Status:** Ten blocking decisions, the seven schema-pack decisions, and the five platform decisions accepted on 3 November 2026. The AI execution pack was accepted on 6 November 2026 as ADR-025, and report PDF export and template management as ADR-027. Source-document amendments remain outstanding for most ADRs; the ADR-004, ADR-008, ADR-013, and ADR-019 amendments were applied on 6 November 2026.
 
 **Date opened:** 3 November 2026
 
@@ -39,6 +39,7 @@
 | ADR-024 | Investigation creation authorization, lifecycle, and manual summaries | Accepted | 2026-11-06 |
 | ADR-025 | AI execution pack: structured output, budgets, prompts, injection defence, and provider surface | Accepted | 2026-11-06 |
 | ADR-026 | Editorial Research Console visual system and interface redesign | Accepted | 2026-11-06 |
+| ADR-027 | Report PDF export and template management | Accepted | 2026-11-06 |
 
 ---
 
@@ -445,12 +446,12 @@ The DB attaches reports to an investigation; the report flow begins with a confi
 
 ### Follow-ups
 
-- The reports v1 implementation uses a built-in Markdown section schema. Template selection and
-  workspace/system template management are not exposed in the UI yet.
-- Decide PDF generation and template rendering (M-37).
+- ~~The reports v1 implementation uses a built-in Markdown section schema. Template selection and
+  workspace/system template management are not exposed in the UI yet.~~ Resolved by ADR-027.
+- ~~Decide PDF generation and template rendering (M-37).~~ Resolved by ADR-027.
 - Define the report completeness checklist; v1 validates finding readiness and required evidence
   before submission and approval.
-- Seed system templates for common report types.
+- ~~Seed system templates for common report types.~~ Seeded by migration in ADR-027.
 
 ---
 
@@ -1451,3 +1452,40 @@ Phase 5 integrates Anthropic Claude and the AI orchestration foundation. The sou
 
 - `DESIGN-BRIEF.md` is updated to version 2.0 with the approved visual system.
 - Older phase summaries in `CLAUDE.md` and `ENGINEERING.md` remain historical; accepted ADRs and `PROJECT-STATUS.md` describe implemented functionality.
+
+---
+
+## ADR-027 — Report PDF export and report template management
+
+**Status:** Accepted
+**Date:** 2026-11-06
+**Resolves:** M-37 and the ADR-008 template/PDF follow-ups
+
+### Context
+
+ADR-008 makes Markdown the canonical report format and requires a versioned template model. It leaves two implementation gaps: the PDF renderer used by M-37, and the policy for selecting and managing system and workspace templates. Reports must remain human-approved, immutable per revision, and free of AI-authored content.
+
+### Decision
+
+1. **PDF is a derived export.** The canonical report format remains the Markdown stored in the approved `ReportRevision`. A PDF export renders that exact revision content and never mutates the report, finding, evidence, or template records.
+2. **PDF renderer.** PDF generation uses `pdf-lib` in the Node.js runtime. It is a deterministic, in-process Markdown renderer: non-AI, no network access, no headless browser, and no external rendering worker. It supports headings, paragraphs, bullet lists, blockquotes, horizontal rules, code blocks, A4 page breaks, standard embedded PDF fonts, metadata, and page footers. Characters outside the standard font encoding are replaced rather than failing the export.
+3. **Export formats.** Both `MARKDOWN` and `PDF` are valid report exports. Either is available only when a report is `APPROVED` or `EXPORTED`. The first export records `REPORT_EXPORTED`, moves the report to `EXPORTED`, and records the format and filename. Re-downloading an exported report is read-only and does not create another audit event.
+4. **Templates are versioned by name.** System templates are seeded by migration and are read-only. Workspace templates are created and activated or deactivated by `OWNER` or `ADMIN`; creating another template with the same name saves the next version. A deactivated template cannot be selected for a new report. Existing reports keep their `templateId` and the rendered revision content.
+5. **Required sections are protected.** Every template includes `summary`, `findings`, `evidence`, `assumptions`, and `missing-information`, so reports always label findings, approved evidence, assumptions, and gaps separately. Templates may add `methodology` and `recommendations` and control the section order. Template changes never rewrite historical revisions.
+6. **Readiness is template-independent.** Submission and approval continue to re-check confirmed/reportable status, severity and rationale, affected asset and type, impact, remediation, and supporting approved evidence. Selecting a template cannot bypass report readiness.
+
+### Consequences
+
+- PDF export works on Vercel without a browser worker or additional infrastructure.
+- Generated PDFs are intentionally basic and semantic; pixel-perfect PDF fidelity remains out of scope.
+- Markdown stays the canonical, diffable, re-exportable artefact.
+- System templates require `prisma migrate deploy`; the migration is idempotent by fixed template ID.
+- Workspace template management is an owner/administrator action and is audited.
+- The standard PDF fonts limit non-Latin glyph support until a font-embedding strategy is adopted.
+
+### Required document amendments
+
+- `TECHNICAL-REQUIREMENTS.md` §5.8: record PDF export via the deterministic server-side renderer and the template management policy.
+- `PRD.md` §4.9: note that PDF is a derived basic export and Markdown remains canonical.
+- `DEVELOPMENT-READINESS-REPORT.md` M-37: mark PDF export resolved by ADR-027.
+- `DATABASE-SCHEMA.md` §5: note that system templates are seeded read-only and workspace templates are versioned by name.

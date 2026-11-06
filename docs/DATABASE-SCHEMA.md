@@ -715,7 +715,9 @@ Fields:
 - createdAt
 - updatedAt
 
-Templates are versioned. A template change does not rewrite historical report revisions.
+Templates are versioned. A template change does not rewrite historical report revisions. System
+templates are seeded read-only by migration; workspace templates are managed by an owner or
+administrator and a new version is created when the same name is saved again (ADR-027).
 
 ### ReportRevision
 

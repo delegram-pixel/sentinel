@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildReportTemplateSections,
+  canManageReportTemplates,
   canTransitionReport,
+  DEFAULT_REPORT_TEMPLATE_SECTIONS,
   isHumanReviewer,
+  parseReportTemplateSections,
   renderReportMarkdown,
   reportContentSchema,
   reportCreateSchema,
   reportFileName,
   reportReadinessProblems,
+  reportTemplateCreateSchema,
   type ReportFindingInput,
   type ReportSource,
 } from "@/modules/reports/domain/report";
@@ -189,5 +194,81 @@ describe("report input validation", () => {
   it("builds a safe Markdown filename", () => {
     expect(reportFileName("Web App Assessment: Q4/2026")).toBe("web-app-assessment-q42026.md");
     expect(reportFileName("   ")).toBe("report.md");
+    expect(reportFileName("Web App Assessment: Q4/2026", "PDF")).toBe(
+      "web-app-assessment-q42026.pdf",
+    );
+  });
+});
+
+describe("report templates", () => {
+  it("keeps every required section and adds optional sections", () => {
+    const sections = buildReportTemplateSections([
+      "summary",
+      "findings",
+      "evidence",
+      "assumptions",
+      "missing-information",
+      "methodology",
+      "recommendations",
+    ]);
+
+    expect(sections).toHaveLength(7);
+    expect(sections.map((section) => section.id)).toEqual([
+      "summary",
+      "findings",
+      "evidence",
+      "assumptions",
+      "missing-information",
+      "methodology",
+      "recommendations",
+    ]);
+  });
+
+  it("falls back to the default schema when a required section is missing", () => {
+    expect(
+      parseReportTemplateSections([{ id: "summary", title: "Summary", required: true }]),
+    ).toEqual(DEFAULT_REPORT_TEMPLATE_SECTIONS);
+  });
+
+  it("validates template names and required sections", () => {
+    expect(
+      reportTemplateCreateSchema.safeParse({
+        name: "Assessment report",
+        sectionIds: ["summary", "findings", "evidence", "assumptions", "missing-information"],
+      }).success,
+    ).toBe(true);
+    expect(
+      reportTemplateCreateSchema.safeParse({
+        name: "Assessment report",
+        sectionIds: ["summary", "findings"],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("renders optional sections in the schema order", () => {
+    const markdown = renderReportMarkdown(
+      source({
+        sections: buildReportTemplateSections([
+          "summary",
+          "findings",
+          "evidence",
+          "assumptions",
+          "missing-information",
+          "methodology",
+          "recommendations",
+        ]),
+      }),
+    );
+
+    expect(markdown).toContain("## Methodology");
+    expect(markdown).toContain("## Recommendations");
+    expect(markdown.indexOf("## Methodology")).toBeLessThan(markdown.indexOf("## Recommendations"));
+  });
+
+  it("reserves template management for owners and administrators", () => {
+    expect(canManageReportTemplates("OWNER")).toBe(true);
+    expect(canManageReportTemplates("ADMIN")).toBe(true);
+    expect(canManageReportTemplates("REVIEWER")).toBe(false);
+    expect(canManageReportTemplates("RESEARCHER")).toBe(false);
   });
 });
