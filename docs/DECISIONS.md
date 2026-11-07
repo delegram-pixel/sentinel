@@ -40,6 +40,8 @@
 | ADR-025 | AI execution pack: structured output, budgets, prompts, injection defence, and provider surface | Accepted | 2026-11-06 |
 | ADR-026 | Editorial Research Console visual system and interface redesign | Accepted | 2026-11-06 |
 | ADR-027 | Report PDF export and template management | Accepted | 2026-11-06 |
+| ADR-031 | Skippable first-use workspace tour | Accepted | 2026-11-07 |
+| ADR-032 | Vercel production deployment through GitHub Actions | Accepted | 2026-11-07 |
 
 ---
 
@@ -1526,3 +1528,72 @@ Reserve rolling usage budgets atomically per user, use stable operation keys, an
 Six logical responsibilities reuse V1 task identities: RECON_ANALYSIS is the Research Context Agent; PATTERN_ANALYSIS, HYPOTHESIS_GENERATION, EVIDENCE_REVIEW, FALSE_POSITIVE_REVIEW and REPORT_GENERATION provide pattern, hypothesis, evidence, independent verification and reporting analysis. They perform reasoning over supplied sources only. Guided requests and delegated staged requests are recorded in durable job payloads. Every stage retains its own exact context, model attempts and validated output. Human adoption creates draft hypotheses or explicitly labelled AI observations and a source-linked research decision.
 
 This amends ADR-027's exclusion of AI-authored content: an explicitly adopted AI report draft may become an AI_ASSISTED report revision with source-task/prompt/model provenance. Subsequent human edits create further revisions. The existing deterministic report renderer and template path remain available. Human approval, source readiness and immutable approved Markdown remain mandatory; no agent can confirm, approve, export or submit its own work.
+
+## ADR-031 — Skippable first-use workspace tour
+
+**Status:** Accepted
+**Date:** 2026-11-07
+**Authority:** User instruction to build a tour that appears when a new user joins.
+**Amends:** ADR-023's deferral of product onboarding; questionnaire onboarding remains deferred.
+
+Newly provisioned accounts receive `User.onboardingVersion = 2` in the create branch of the shared Clerk provisioning store. The existing schema default remains 1, preserving legacy users without enrolling them on their next sign-in. Profile updates and repeated provisioning never change the version or completion timestamp.
+
+The authenticated dashboard streams a six-step tour of projects/scope, investigations/advisory AI, evidence/imports, human verification, and reports/outcomes. Dashboard access remains immediate. Skip, Escape, and Finish all acknowledge the tour by setting `onboardingCompletedAt` once for the current version; the timestamp represents dismissal or completion, not proof that every step was read. The Server Action takes no user identifier and derives identity from the session. Replays in Settings do not clear completion or upgrade legacy/future progress. No research permission, scope, or approval changes occur.
+
+The accessible Radix dialog traps focus and restores it on close; its body scrolls on small screens while navigation remains available. A failed save offers retry and a local “Close for now” option, which leaves server progress unchanged and may show the tour again on the next visit. The client suppresses repeated automatic starts within the same dashboard visit. No schema migration or additional dependency is required.
+
+The tour includes practical walkthroughs and expected outcomes for every stage. Contextual question-mark tooltips explain every navigation section and consequential form fields, including scope rules, authorization, provenance/redaction, verification, reporting, and AI context/history. Help opens on hover, keyboard focus, or click/touch and closes with Escape or an outside interaction. Essential form instructions stay visible; tooltip controls are separate buttons so they cannot submit a form or change its field label.
+
+---
+
+## ADR-032 — Vercel production deployment through GitHub Actions
+
+**Status:** Accepted
+**Date:** 2026-11-07
+**Builds on:** ADR-018 (Vercel + Neon), ADR-021 (GitHub Actions CI)
+
+### Context
+
+ADR-018 names Vercel as the hosting target and requires migrations to use `prisma migrate deploy`.
+ADR-021 makes GitHub Actions the CI system. Production must not deploy when checks fail, and a new
+application version must not run against an unmigrated database. Vercel's Git integration would
+otherwise deploy `main` immediately, before CI completes and before migrations run.
+
+### Decision
+
+1. GitHub Actions owns production deployments. The `deploy` job runs only for `main`, after the
+   quality, integration, and end-to-end jobs pass.
+2. `vercel.json` disables Git-triggered deployments for `main`. Preview deployments for other
+   branches remain available through Vercel's Git integration.
+3. The deploy job pulls the Vercel **Production** environment and uses its `DATABASE_URL` and
+   `DIRECT_URL` to run `yarn db:deploy`. It then builds a prebuilt Vercel output and deploys it. A
+   failed migration stops the deployment before promotion.
+4. Database credentials are not duplicated as GitHub secrets. Vercel environment variables remain
+   the single source of truth for runtime and migration connections.
+5. GitHub stores only `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. The job uses the
+   `production` GitHub environment for protection and auditability.
+6. Manual deployment is allowed only through `workflow_dispatch` on `main`; arbitrary branches cannot
+   be promoted to production.
+7. Preview environments use a separate Neon branch or database and must never share production
+   database, storage, or AI credentials.
+8. The durable research worker is not deployed to Vercel. It runs on a supervised host with the same
+   database and storage configuration, as documented in `docs/v2/V2_OPERATIONS.md`.
+
+### Consequences
+
+- Production deploys are gated by CI and by schema compatibility.
+- Neon migrations can never be skipped by a direct Vercel Git deployment of `main`.
+- Preview deployments remain convenient but require separate preview credentials.
+- Deployment credentials must be configured once in GitHub and Vercel.
+- Additive migrations remain mandatory because migrations run before the new build is promoted.
+
+### Required document amendments
+
+- `README.md`: document the Vercel project, GitHub secrets, and deploy flow.
+- `docs/v2/V2_OPERATIONS.md`: reference the non-Vercel worker and migration ordering.
+
+### Follow-ups
+
+- Configure the Vercel project, production environment, preview Neon branch, and GitHub secrets.
+- Decide whether preview Neon branches are created automatically per pull request.
+- Add deployment alerting and a rollback rehearsal.

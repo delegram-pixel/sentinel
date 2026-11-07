@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldHelpLabel } from "@/components/shared/field-help-label";
 
 export type ResearchFormState = { status: "idle" | "success" | "error"; message?: string };
 export type ResearchField = {
@@ -45,7 +46,13 @@ export function ResearchActionForm({
       ) : null}
       {fields.map((field) => (
         <div className="grid gap-2" key={field.name}>
-          <Label htmlFor={`${id}-${field.name}`}>{field.label}</Label>
+          {field.help ? (
+            <FieldHelpLabel htmlFor={`${id}-${field.name}`} help={{ description: field.help }}>
+              {field.label}
+            </FieldHelpLabel>
+          ) : (
+            <Label htmlFor={`${id}-${field.name}`}>{field.label}</Label>
+          )}
           {field.options ? (
             <Select
               id={`${id}-${field.name}`}

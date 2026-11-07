@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldHelpLabel } from "@/components/shared/field-help-label";
+
 import { useFormErrorFocus } from "@/components/shared/use-form-error-focus";
 
 import { LoaderCircle, Trash2 } from "lucide-react";
@@ -248,7 +250,17 @@ export function SeverityAssessmentForm({
           </Field>
 
           <Field className="sm:col-span-2">
-            <FieldLabel htmlFor="finding-severity-rationale">Severity rationale</FieldLabel>
+            <FieldHelpLabel
+              htmlFor="finding-severity-rationale"
+              help={{
+                description:
+                  "Explain why the chosen severity fits the demonstrated impact, affected asset, required conditions, and limitations of the evidence.",
+                example:
+                  "Describe the sensitivity of the exposed information and the prerequisites for access, rather than relying only on the vulnerability category.",
+              }}
+            >
+              Severity rationale
+            </FieldHelpLabel>
             <Textarea
               id="finding-severity-rationale"
               name="severityRationale"
@@ -310,7 +322,18 @@ export function VerificationReviewForm({
 
         <FieldGroup className="grid gap-4 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="review-conclusion">Human conclusion</FieldLabel>
+            <FieldHelpLabel
+              htmlFor="review-conclusion"
+              help={{
+                description:
+                  "Record the reviewer's decision based on supporting, contradictory, and missing evidence. Confirmation requires the existing readiness checks to pass.",
+                example:
+                  "Choose Needs more evidence when the observation is plausible but the affected asset or impact has not been established.",
+                note: "Only an authorized human reviewer can confirm, reject, or mark a finding as a false positive. AI advice is not a verification decision.",
+              }}
+            >
+              Human conclusion
+            </FieldHelpLabel>
             <Select
               id="review-conclusion"
               name="conclusion"
@@ -514,7 +537,18 @@ export function EvidenceLinkForm({
             </Select>
           </Field>
           <Field>
-            <FieldLabel htmlFor="link-relationship">Relationship</FieldLabel>
+            <FieldHelpLabel
+              htmlFor="link-relationship"
+              help={{
+                description:
+                  "Explain how the linked evidence relates to the finding. Supporting material backs the claim; contradicting material challenges it; contextual material adds background.",
+                example:
+                  "Link a reproduced response as support and a response that rules out an assumed condition as contradictory evidence.",
+                note: "Approved findings must retain supporting evidence; removing the last supporting link is blocked.",
+              }}
+            >
+              Relationship
+            </FieldHelpLabel>
             <Select id="link-relationship" name="relationshipType" defaultValue="SUPPORTS">
               {EVIDENCE_LINK_RELATIONSHIPS.map((relationship) => (
                 <option key={relationship} value={relationship}>

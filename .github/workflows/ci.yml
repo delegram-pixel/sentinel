@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -115,3 +119,72 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  deploy:
+    name: Deploy production to Vercel
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: [quality, integration, e2e]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    concurrency:
+      group: vercel-production
+      cancel-in-progress: false
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # Pull the production environment from Vercel so migrations and the build
+      # use the same Neon connection strings that the deployment will use.
+      - name: Pull Vercel production environment
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Apply production database migrations
+        run: |
+          node -e '
+          const env = require("dotenv").config({ path: ".vercel/.env.production.local", quiet: true }).parsed ?? {};
+          if (!env.DATABASE_URL) {
+            console.error("DATABASE_URL is not set in the Vercel Production environment.");
+            process.exit(1);
+          }
+          if (!env.DIRECT_URL) {
+            console.error("DIRECT_URL is not set in the Vercel Production environment.");
+            process.exit(1);
+          }
+          if (env.DIRECT_URL.includes("-pooler.")) {
+            console.error("DIRECT_URL must use the direct Neon connection, not the pooler.");
+            process.exit(1);
+          }
+          '
+          cp .vercel/.env.production.local .env
+          yarn db:deploy
+
+      - name: Build Vercel output
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy to Vercel
+        id: deploy
+        run: |
+          url="$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Deployment summary
+        run: echo "Deployed production to ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"

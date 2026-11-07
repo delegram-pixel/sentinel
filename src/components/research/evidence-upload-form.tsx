@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldHelpLabel } from "@/components/shared/field-help-label";
+
 import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -296,7 +298,18 @@ export function EvidenceUploadForm({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="evidence-source">Source</FieldLabel>
+              <FieldHelpLabel
+                htmlFor="evidence-source"
+                help={{
+                  description:
+                    "Explain where this material originated and how it relates to the investigation. Keep enough provenance for a reviewer to trace the original observation.",
+                  example:
+                    "A response capture from the local lab, collected during the access-control investigation; record the capture date and collection method in the description.",
+                  note: "A filename alone rarely explains who collected the material or what it demonstrates.",
+                }}
+              >
+                Source
+              </FieldHelpLabel>
               <Input
                 id="evidence-source"
                 name="source"
@@ -322,7 +335,18 @@ export function EvidenceUploadForm({
 
           {textContent !== null ? (
             <Field>
-              <FieldLabel htmlFor="evidence-text">Redaction review</FieldLabel>
+              <FieldHelpLabel
+                htmlFor="evidence-text"
+                help={{
+                  description:
+                    "Review the text that will be uploaded and remove secrets or personal information before confirming the redaction review.",
+                  example:
+                    "Replace access tokens, session cookies, email addresses, and unnecessary account identifiers while retaining the parts needed to understand the observation.",
+                  note: "Upload validation, human evidence approval, and AI-safe review remain separate checks.",
+                }}
+              >
+                Redaction review
+              </FieldHelpLabel>
               <Textarea
                 id="evidence-text"
                 name="textContent"

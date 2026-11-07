@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldHelpLabel } from "@/components/shared/field-help-label";
+
 import { useFormErrorFocus } from "@/components/shared/use-form-error-focus";
 
 import { LoaderCircle } from "lucide-react";
@@ -109,7 +111,18 @@ export function ProjectForm(props: ProjectFormProps) {
           </Field>
 
           <Field data-invalid={Boolean(fieldErrors?.projectType)}>
-            <Label htmlFor="project-type">Project type</Label>
+            <FieldHelpLabel
+              htmlFor="project-type"
+              help={{
+                description:
+                  "Describe the setting for this work so the project has the right research context. This classification does not grant testing permission.",
+                example:
+                  "Choose Learning lab for an isolated practice application; use the appropriate assessment type for explicitly authorized work.",
+                note: "Each target still needs its own approved, active scope.",
+              }}
+            >
+              Project type
+            </FieldHelpLabel>
             <Select
               id="project-type"
               name="projectType"
@@ -131,7 +144,17 @@ export function ProjectForm(props: ProjectFormProps) {
           </Field>
 
           <Field data-invalid={Boolean(fieldErrors?.description)}>
-            <Label htmlFor="project-description">Description</Label>
+            <FieldHelpLabel
+              htmlFor="project-description"
+              help={{
+                description:
+                  "Explain the purpose of the project, its intended research boundaries, and useful background for someone reviewing it later.",
+                example:
+                  "Review access control in a local practice application using supplied request/response captures.",
+              }}
+            >
+              Description
+            </FieldHelpLabel>
             <Textarea
               id="project-description"
               name="description"

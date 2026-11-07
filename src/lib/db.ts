@@ -5,6 +5,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { getServerEnv } from "@/config/env.server";
 import { PrismaClient } from "@/generated/prisma/client";
 
+import { PostgresSocket } from "./postgres-socket";
+
 /**
  * Build a Prisma client for an explicit connection string.
  *
@@ -13,7 +15,13 @@ import { PrismaClient } from "@/generated/prisma/client";
  * connection or a transaction scope with application code.
  */
 export function createPrismaClient(connectionString: string): PrismaClient {
-  return new PrismaClient({ adapter: new PrismaPg(connectionString) });
+  return new PrismaClient({
+    adapter: new PrismaPg({
+      connectionString,
+      connectionTimeoutMillis: 15_000,
+      stream: () => new PostgresSocket(),
+    }),
+  });
 }
 
 const globalForPrisma = globalThis as typeof globalThis & {

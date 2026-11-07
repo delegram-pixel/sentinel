@@ -2,6 +2,10 @@
 
 This runbook uses the existing Next.js application, PostgreSQL database and private evidence-storage adapters. The worker runs the same application code and database; no microservice, target scanner or external submission system is introduced.
 
+## Production deployment
+
+Production is deployed from GitHub Actions after the quality, integration and end-to-end jobs pass on `main` (ADR-032). The deploy job pulls the Vercel Production environment, applies `yarn db:deploy` with that environment's `DATABASE_URL` and `DIRECT_URL`, builds a prebuilt Vercel output, then promotes it. A failed migration stops promotion. Vercel Git deployments are disabled for `main` in `vercel.json`; preview branches use a separate Neon branch and Preview environment. The worker still runs outside Vercel.
+
 ## Database preparation
 
 Use a disposable restored V1 database first. Inventory original record UUIDs/tenant relations, scope approvals/expiry, evidence keys/checksums and report revision Markdown hashes. Apply the production migration path to that restored copy, run the backfill twice, and reconcile the inventory. The automated preservation fixture does not replace this deployment rehearsal.

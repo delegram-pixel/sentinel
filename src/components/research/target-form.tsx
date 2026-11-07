@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldHelpLabel } from "@/components/shared/field-help-label";
+
 import { useFormErrorFocus } from "@/components/shared/use-form-error-focus";
 
 import { LoaderCircle } from "lucide-react";
@@ -152,7 +154,18 @@ export function TargetForm(props: TargetFormProps) {
           </Field>
 
           <Field data-invalid={Boolean(state.fieldErrors?.assetIdentifier)}>
-            <Label htmlFor="asset-identifier">Asset identifier</Label>
+            <FieldHelpLabel
+              htmlFor="asset-identifier"
+              help={{
+                description:
+                  "Identify the actual asset you are researching. Match the identifier format to the selected asset type and use the same identity when defining scope.",
+                example:
+                  "For a domain target, enter lab.example.test. For a URL target, enter the complete permitted URL.",
+                note: "Adding the asset records it; it does not grant authorization.",
+              }}
+            >
+              Asset identifier
+            </FieldHelpLabel>
             <Input
               id="asset-identifier"
               name="assetIdentifier"
@@ -191,7 +204,17 @@ export function TargetForm(props: TargetFormProps) {
             </Field>
 
             <Field data-invalid={Boolean(state.fieldErrors?.environmentType)}>
-              <Label htmlFor="environment-type">Environment</Label>
+              <FieldHelpLabel
+                htmlFor="environment-type"
+                help={{
+                  description:
+                    "Record whether this is a practice lab, staging system, production asset, or another environment. This helps reviewers interpret observations and their impact.",
+                  example:
+                    "Use Practice lab for an isolated training application rather than a production service.",
+                }}
+              >
+                Environment
+              </FieldHelpLabel>
               <Select
                 id="environment-type"
                 name="environmentType"
@@ -272,7 +295,18 @@ export function TargetForm(props: TargetFormProps) {
 
           <div className="grid gap-5 sm:grid-cols-2">
             <Field data-invalid={Boolean(state.fieldErrors?.authorizationSource)}>
-              <Label htmlFor="authorization-source">Authorization source</Label>
+              <FieldHelpLabel
+                htmlFor="authorization-source"
+                help={{
+                  description:
+                    "Identify the document, programme terms, or owner permission that establishes your right to research the target.",
+                  example:
+                    "Reference the approved assessment agreement or a lab that you own, then document the allowed boundaries in scope.",
+                  note: "This background is separate from the active ScopeVersion that the platform enforces.",
+                }}
+              >
+                Authorization source
+              </FieldHelpLabel>
               <Input
                 id="authorization-source"
                 name="authorizationSource"

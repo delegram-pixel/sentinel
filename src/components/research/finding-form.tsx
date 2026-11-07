@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldHelpLabel } from "@/components/shared/field-help-label";
+
 import { useFormErrorFocus } from "@/components/shared/use-form-error-focus";
 
 import { LoaderCircle } from "lucide-react";
@@ -172,7 +174,17 @@ export function FindingForm(props: FindingFormProps) {
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="finding-asset">Affected asset</FieldLabel>
+              <FieldHelpLabel
+                htmlFor="finding-asset"
+                help={{
+                  description:
+                    "Identify the specific asset, endpoint, or component affected by this claim. Keep it precise enough to connect the finding to its scope and evidence.",
+                  example:
+                    "The /profile endpoint in the authorized lab application, rather than the entire project.",
+                }}
+              >
+                Affected asset
+              </FieldHelpLabel>
               <Input
                 id="finding-asset"
                 name="affectedAsset"
@@ -210,7 +222,18 @@ export function FindingForm(props: FindingFormProps) {
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="finding-impact">Impact</FieldLabel>
+              <FieldHelpLabel
+                htmlFor="finding-impact"
+                help={{
+                  description:
+                    "Explain the consequence supported by the evidence, who or what is affected, and any conditions needed for that consequence to occur.",
+                  example:
+                    "A supplied response exposes another lab account's profile fields when the recorded request uses that account's identifier.",
+                  note: "Distinguish demonstrated impact from assumptions or a possible worst case.",
+                }}
+              >
+                Impact
+              </FieldHelpLabel>
               <Textarea
                 id="finding-impact"
                 name="impact"

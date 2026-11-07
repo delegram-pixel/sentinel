@@ -93,6 +93,13 @@ function TaskHistory({ tasks }: { tasks: AiTaskRow[] }) {
     <ResearchSection
       id="ai-task-history"
       title="Task history"
+      help={{
+        description:
+          "Every AI request retains execution status and model/prompt provenance. Inspect the task's sources, attempts, and failure details before trusting its result or retrying it.",
+        example:
+          "After an evidence review, open the recorded task to see the exact input context and the validated output.",
+        note: "A completed task means analysis finished; it is not human finding approval.",
+      }}
       description="Recorded execution status, model and prompt provenance, and token usage."
     >
       {tasks.length === 0 ? (
@@ -249,7 +256,17 @@ export function AiWorkspace({
       ) : null}
       <div className="grid min-w-0 gap-8 xl:grid-cols-[14rem_minmax(0,1fr)] xl:gap-10">
         <aside className="flex min-w-0 flex-col gap-7" aria-label="Assistant context and history">
-          <ResearchSection id="ai-context" title="Research context">
+          <ResearchSection
+            id="ai-context"
+            title="Research context"
+            help={{
+              description:
+                "The assistant uses persisted investigation context, including the objective, target and scope, recorded research, and eligible source material. Sources are selected before each request.",
+              example:
+                "Save an observation and link approved evidence before asking the assistant to assess a hypothesis.",
+              note: "Check the task snapshot to see what the model actually received. Unapproved or non-AI-safe material must not be assumed available.",
+            }}
+          >
             <MetadataList
               items={[
                 {
@@ -283,7 +300,16 @@ export function AiWorkspace({
               findings.
             </p>
           </ResearchSection>
-          <ResearchSection id="ai-conversations" title="Conversation history">
+          <ResearchSection
+            id="ai-conversations"
+            title="Conversation history"
+            help={{
+              description:
+                "Conversations retain the investigation's user and assistant messages. Guided questions use this history alongside saved research context; summaries help preserve the working research thread.",
+              example:
+                "Keep follow-up questions about the same hypothesis in one conversation, and start another for a distinct line of research.",
+            }}
+          >
             {!archived ? (
               <Disclosure title="Start conversation">
                 <NewConversationForm investigationId={investigationId} disabled={archived} />
@@ -369,6 +395,13 @@ export function AiWorkspace({
                 <ResearchSection
                   id="bounded-analysis"
                   title="Bounded research tasks"
+                  help={{
+                    description:
+                      "Guided mode answers a focused question in conversation. Delegated mode records analytical tasks or staged analysis over supplied investigation material. Both return proposals for review.",
+                    example:
+                      "Use guided mode to ask what an observation supports, or delegated analysis for a structured review of context, evidence, or hypotheses.",
+                    note: "AI cannot autonomously test targets, confirm findings, or approve reports. Review sources and uncertainty before adoption.",
+                  }}
                   description="Run one analysis against saved investigation context. Review the result before incorporating it into your research."
                 >
                   <div className="flex flex-col gap-5">

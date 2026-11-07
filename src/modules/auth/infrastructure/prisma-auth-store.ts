@@ -6,6 +6,7 @@ import type { Prisma } from "@/generated/prisma/client";
 
 import type { AuthenticatedIdentity } from "../domain/identity";
 import type { AuthStore, SessionContext } from "../application/ports";
+import { WORKSPACE_TOUR_VERSION } from "../domain/workspace-tour";
 
 type DatabaseClient = Prisma.TransactionClient;
 
@@ -73,6 +74,7 @@ export class PrismaAuthStore implements AuthStore {
           email: identity.email,
           displayName: identity.displayName,
           avatarUrl: identity.avatarUrl,
+          onboardingVersion: WORKSPACE_TOUR_VERSION,
         },
         update: {
           email: identity.email,

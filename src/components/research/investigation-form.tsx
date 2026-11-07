@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldHelpLabel } from "@/components/shared/field-help-label";
+
 import { useFormErrorFocus } from "@/components/shared/use-form-error-focus";
 
 import { LoaderCircle } from "lucide-react";
@@ -251,7 +253,18 @@ export function InvestigationForm(props: InvestigationFormProps) {
           </Field>
 
           <Field data-invalid={Boolean(state.fieldErrors?.objective)}>
-            <Label htmlFor="investigation-objective">Research objective</Label>
+            <FieldHelpLabel
+              htmlFor="investigation-objective"
+              help={{
+                description:
+                  "State one question the investigation should answer and what evidence would resolve it. A focused objective improves research decisions and AI context.",
+                example:
+                  "Determine whether the supplied response exposes another account's data, and identify the evidence needed to rule out expected behavior.",
+                note: "Describe the research question here; record confirmed impact only after verification.",
+              }}
+            >
+              Research objective
+            </FieldHelpLabel>
             <Textarea
               id="investigation-objective"
               name="objective"

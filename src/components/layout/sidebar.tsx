@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { isNavItemActive, NAV_GROUPS } from "@/components/layout/nav";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { HelpTooltip } from "@/components/shared/help-tooltip";
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -48,18 +49,26 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               {group.items.map((item) => {
                 const active = isNavItemActive(pathname, item);
                 return (
-                  <li key={item.href}>
+                  <li key={item.href} className="flex items-center gap-0.5">
                     <Link
                       href={item.href}
                       onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex min-h-10 items-center border-l-2 border-transparent px-3 py-2 text-[13px] text-text-secondary transition-colors hover:bg-secondary hover:text-foreground",
+                        "flex min-h-10 min-w-0 flex-1 items-center border-l-2 border-transparent px-3 py-2 text-[13px] text-text-secondary transition-colors hover:bg-secondary hover:text-foreground",
                         active && "border-primary font-medium text-foreground",
                       )}
                     >
                       {item.label}
                     </Link>
+                    {item.help ? (
+                      <HelpTooltip
+                        label={item.label}
+                        {...item.help}
+                        side={onNavigate ? "bottom" : "right"}
+                        sideOffset={onNavigate ? 8 : 24}
+                      />
+                    ) : null}
                   </li>
                 );
               })}

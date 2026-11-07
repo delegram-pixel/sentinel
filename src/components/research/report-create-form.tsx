@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldHelpLabel } from "@/components/shared/field-help-label";
+
 import { LoaderCircle } from "lucide-react";
 import { useActionState } from "react";
 
@@ -73,7 +75,18 @@ export function ReportCreateForm({
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="report-template">Report template</FieldLabel>
+          <FieldHelpLabel
+            htmlFor="report-template"
+            help={{
+              description:
+                "Choose the structure and sections used to build the report draft. The template organizes the material; it does not approve the findings or the resulting report.",
+              example:
+                "Choose a template suited to the intended audience, then review the selected findings and generated narrative before approval.",
+              note: "Report revisions retain history. Export requires human approval and ready source records.",
+            }}
+          >
+            Report template
+          </FieldHelpLabel>
           <Select
             id="report-template"
             name="templateId"

@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldHelpLabel } from "@/components/shared/field-help-label";
+
 import { useFormErrorFocus } from "@/components/shared/use-form-error-focus";
 
 import { LoaderCircle, Plus, Trash2 } from "lucide-react";
@@ -132,6 +134,13 @@ export function ScopeDraftForm({
       <ResearchSection
         id="form-effective-window"
         title="Effective window"
+        help={{
+          description:
+            "Define the period during which the scope may authorize platform capabilities. A draft or a scope outside its effective window is not an active authorization.",
+          example:
+            "Use the start and end times from the assessment agreement, and review them before activation.",
+          note: "Saving this form creates a draft. Approval and activation are separate steps.",
+        }}
         description={<> The draft only permits action inside this window, once it is activated. </>}
       >
         <FieldGroup className="grid sm:grid-cols-2">
@@ -218,7 +227,18 @@ export function ScopeDraftForm({
                 </Field>
 
                 <Field>
-                  <Label htmlFor={`match-type-${row.id}`}>Match type</Label>
+                  <FieldHelpLabel
+                    htmlFor={`match-type-${row.id}`}
+                    help={{
+                      description:
+                        "Choose how this rule compares an asset to its identifier. Exact matching targets one identity; broader patterns can include more assets.",
+                      example:
+                        "Use an exact rule for one specified URL. Use a domain rule only when that domain is included in the authorization.",
+                      note: "Check the rule's actual meaning before activation; avoid granting a broader boundary than the permission allows.",
+                    }}
+                  >
+                    Match type
+                  </FieldHelpLabel>
                   <Select
                     id={`match-type-${row.id}`}
                     name="matchType"
@@ -234,7 +254,17 @@ export function ScopeDraftForm({
                 </Field>
 
                 <Field>
-                  <Label htmlFor={`effect-${row.id}`}>Effect</Label>
+                  <FieldHelpLabel
+                    htmlFor={`effect-${row.id}`}
+                    help={{
+                      description:
+                        "Mark the asset rule as allowed or excluded. Exclusions narrow the permitted boundary and take precedence over a matching allow rule.",
+                      example:
+                        "Allow the assessment domain and explicitly exclude a third-party asset that the agreement does not cover.",
+                    }}
+                  >
+                    Effect
+                  </FieldHelpLabel>
                   <Select
                     id={`effect-${row.id}`}
                     name="effect"
@@ -283,6 +313,13 @@ export function ScopeDraftForm({
       <ResearchSection
         id="form-permitted-activities"
         title="Permitted activities"
+        help={{
+          description:
+            "Explicitly permit only the capabilities covered by the authorization. Missing or prohibited permissions cannot be inferred from the target name, project type, or engagement status.",
+          example:
+            "Permit reading supplied research context when authorized, and review the description of each capability before selecting it.",
+          note: "Scope permission does not enable an unimplemented capability or autonomous security testing.",
+        }}
         description={
           <>
             {" "}

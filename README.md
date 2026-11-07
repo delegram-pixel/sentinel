@@ -85,6 +85,47 @@ are explicitly skipped when no fixture is supplied. The application always uses 
 Where the native Turbopack compiler cannot run, `PLAYWRIGHT_WEBPACK=1 yarn test:e2e` selects Webpack
 for the browser suite's production build. The default application build remains Turbopack.
 
+## Deployment (Vercel)
+
+Production deploys run through GitHub Actions after the `quality`, `integration`, and `e2e` jobs
+pass on `main`. The deploy job pulls the Vercel production environment, applies `yarn db:deploy`
+against the production Neon database, builds a prebuilt Vercel output, and deploys it. A failed
+migration stops the deployment before any new application version is released. The workflow can also
+be started manually with **Actions → CI → Run workflow** on `main`.
+
+`vercel.json` disables Git-triggered deployments for `main` so production is owned by the workflow.
+Other branches may still use Vercel preview deployments through the Git integration.
+
+### Vercel project setup
+
+1. Import `delegram-pixel/sentinel` into Vercel and keep the repository root as the project root.
+2. Add every variable from `.env.example` to the Vercel **Production** environment. `DATABASE_URL`
+   must be the pooled Neon connection and `DIRECT_URL` the direct Neon connection (ADR-018).
+3. Configure the Vercel **Preview** environment with a separate Neon branch or database. Preview
+   deployments must never use production database, storage, or AI credentials.
+4. Add these repository or `production` environment secrets in GitHub:
+   - `VERCEL_TOKEN`
+   - `VERCEL_ORG_ID`
+   - `VERCEL_PROJECT_ID`
+
+After `vercel link`, both IDs are available in `.vercel/project.json`.
+
+### Web Analytics
+
+[Vercel Web Analytics](https://vercel.com/docs/analytics) is mounted once in the root layout through
+`@vercel/analytics/next`, so page views are reported automatically from production deployments.
+Enable **Web Analytics** for the project in the Vercel dashboard; no additional environment variable
+is required. Local development and tests do not send events.
+
+### Operational notes
+
+- Migrations always use `prisma migrate deploy`; never run `prisma migrate dev` against production.
+- The durable research worker is not started by Vercel. Run `yarn worker` on a supervised host with
+  the same database and storage configuration as the web deployment; see
+  [`docs/v2/V2_OPERATIONS.md`](docs/v2/V2_OPERATIONS.md).
+- Because migrations are applied before the new build is promoted, keep migrations additive and
+  compatible with the previously deployed application version.
+
 ## Stack
 
 - Next.js 16 (App Router, Cache Components)
@@ -173,8 +214,13 @@ ahead of their phase.
 6. UI mutations go through Server Actions; Route Handlers are reserved for asynchronous and
    external boundaries.
 7. Audit records are append-only and never contain secrets or raw evidence.
+
 # sentinel
+
 # sentinel
+
 # sentinel
+
 # sentinel
+
 # sentinel

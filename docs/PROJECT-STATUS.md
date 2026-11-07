@@ -2,6 +2,12 @@
 
 Updated: 7 November 2026.
 
+## First-use workspace tour
+
+New accounts now receive a skippable six-step research workflow tour in the dashboard. Skip/Finish/Escape save dismissal against the authenticated user; Settings offers replay. Existing accounts are not automatically enrolled, and legacy/future onboarding versions remain unchanged. A save failure allows retry or closing for the current visit. This reuses existing onboarding fields without a migration or new dependency (ADR-031).
+
+Each tour stage includes an example workflow and expected outcome. Detailed hover/focus/click tooltips cover all navigation sections plus important project, target, scope, investigation, evidence, finding, reporting, and AI fields/sections. Existing inline instructions and authorization gates remain in place.
+
 ## V2 implementation checkpoint
 
 The user's instruction to build V2 authorized implementation after the architecture audit. The working tree now includes engagement/scope associations, research decisions, reviewed knowledge/full-text retrieval, persistent AI jobs and execution snapshots, six logical analytical agents, evidence provenance/relationships/recovery, supplied JSON/CSV/SARIF imports, manual remediation/retests/outcomes, AI draft adoption and research insights. Existing V1 models, routes, human approval authority and deterministic report exports remain in use.

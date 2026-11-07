@@ -2,6 +2,7 @@ import { MetadataList } from "@/components/shared/metadata-list";
 import { ResearchSection } from "@/components/shared/research-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SessionContext } from "@/modules/auth/application/ports";
+import { ReplayWorkspaceTourButton } from "@/components/onboarding/workspace-tour-provider";
 
 export function SettingsDetails({ session }: { session: SessionContext }) {
   return (
@@ -20,6 +21,12 @@ export function SettingsDetails({ session }: { session: SessionContext }) {
         <p className="mt-6 text-xs leading-relaxed text-text-secondary">
           Use the account menu in the header to manage your profile or sign out.
         </p>
+        <div className="mt-6 flex flex-col gap-2">
+          <ReplayWorkspaceTourButton />
+          <p className="text-xs text-text-secondary">
+            A quick guide to the research workflow and where to find things.
+          </p>
+        </div>
       </ResearchSection>
       <ResearchSection
         id="workspace"
