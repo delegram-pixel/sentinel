@@ -137,6 +137,19 @@ jobs:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
+      - name: Validate deployment secrets
+        shell: bash
+        run: |
+          deployment_secrets_missing=0
+          for deployment_secret_name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            deployment_secret_value="${!deployment_secret_name:-}"
+            if [[ -z "${deployment_secret_value//[[:space:]]/}" ]]; then
+              echo "::error::${deployment_secret_name} is missing or blank. Add it in GitHub Settings > Secrets and variables > Actions, or in the production environment secrets."
+              deployment_secrets_missing=1
+            fi
+          done
+          exit "$deployment_secrets_missing"
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -159,23 +172,34 @@ jobs:
 
       - name: Apply production database migrations
         run: |
-          node -e '
-          const env = require("dotenv").config({ path: ".vercel/.env.production.local", quiet: true }).parsed ?? {};
-          if (!env.DATABASE_URL) {
-            console.error("DATABASE_URL is not set in the Vercel Production environment.");
-            process.exit(1);
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          import { spawnSync } from "node:child_process";
+          import { parse } from "dotenv";
+          import { parsePostgresUrl } from "./scripts/database-url.mjs";
+
+          try {
+            const env = parse(readFileSync(".vercel/.env.production.local"));
+            const databaseUrl = parsePostgresUrl(env.DATABASE_URL, "DATABASE_URL");
+            const directUrl = parsePostgresUrl(env.DIRECT_URL, "DIRECT_URL");
+            if (!databaseUrl || !directUrl) {
+              throw new Error(`${!databaseUrl ? "DATABASE_URL" : "DIRECT_URL"} is not set in the Vercel Production environment.`);
+            }
+            if (new URL(directUrl).hostname.includes("-pooler.")) {
+              throw new Error("DIRECT_URL must use the direct Neon connection, not the pooler.");
+            }
+
+            const result = spawnSync("yarn", ["db:deploy"], {
+              stdio: "inherit",
+              env: { ...process.env, ...env, DATABASE_URL: databaseUrl, DIRECT_URL: directUrl },
+            });
+            if (result.error) throw result.error;
+            process.exitCode = result.status ?? 1;
+          } catch (error) {
+            console.error(error.message);
+            process.exitCode = 1;
           }
-          if (!env.DIRECT_URL) {
-            console.error("DIRECT_URL is not set in the Vercel Production environment.");
-            process.exit(1);
-          }
-          if (env.DIRECT_URL.includes("-pooler.")) {
-            console.error("DIRECT_URL must use the direct Neon connection, not the pooler.");
-            process.exit(1);
-          }
-          '
-          cp .vercel/.env.production.local .env
-          yarn db:deploy
+          NODE
 
       - name: Build Vercel output
         run: vercel build --prod --token="$VERCEL_TOKEN"

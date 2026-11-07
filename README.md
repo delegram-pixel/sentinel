@@ -110,6 +110,25 @@ Other branches may still use Vercel preview deployments through the Git integrat
 
 After `vercel link`, both IDs are available in `.vercel/project.json`.
 
+Create `VERCEL_TOKEN` in [Vercel account settings → Tokens](https://vercel.com/account/settings/tokens),
+then save its value as a GitHub Actions secret named exactly `VERCEL_TOKEN` in
+[repository settings → Secrets and variables → Actions](https://github.com/delegram-pixel/sentinel/settings/secrets/actions).
+You can also store the three deployment secrets in the GitHub `production` environment. Organization
+secrets must grant this repository access. Setting a token only in Vercel's project environment does
+not make it available to GitHub Actions.
+
+The deploy job checks all three credentials before running its other steps. If `vercel pull` reports
+that `--token` is missing a value, `VERCEL_TOKEN` was empty in the workflow. Add or correct the GitHub
+secret, then rerun the failed deploy job.
+
+Set `DATABASE_URL` and `DIRECT_URL` in Vercel's **Production** environment to the raw Neon connection
+URLs. Each value must start with `postgresql://` or `postgres://`; do not paste the `psql` command,
+literal surrounding quotes, or a variable such as `$DATABASE_URL`. Credentials containing special
+characters must use URL percent encoding. `DIRECT_URL` must use the direct endpoint without
+`-pooler.` in its hostname. The migration step validates both URLs and passes the pulled Vercel values
+directly to Prisma, overriding any inherited database variables. A `P1013` error indicates an invalid
+connection string; correct the named Vercel environment variable and rerun the deploy job.
+
 ### Web Analytics
 
 [Vercel Web Analytics](https://vercel.com/docs/analytics) is mounted once in the root layout through
