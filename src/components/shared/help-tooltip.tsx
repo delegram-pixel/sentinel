@@ -26,11 +26,14 @@ export function HelpTooltip({
 }) {
   const [mode, setMode] = useState<"closed" | "hover" | "pinned">("closed");
   return (
-    <Tooltip open={mode !== "closed"} onOpenChange={(open) => {
-      // A tap/click stays open while the user reads. Touch pointer-leave and
-      // synthesized focus events must not immediately dismiss pinned help.
-      setMode((current) => current === "pinned" ? current : open ? "hover" : "closed");
-    }}>
+    <Tooltip
+      open={mode !== "closed"}
+      onOpenChange={(open) => {
+        // A tap/click stays open while the user reads. Touch pointer-leave and
+        // synthesized focus events must not immediately dismiss pinned help.
+        setMode((current) => (current === "pinned" ? current : open ? "hover" : "closed"));
+      }}
+    >
       <TooltipTrigger asChild>
         <Button
           type="button"
@@ -42,14 +45,17 @@ export function HelpTooltip({
             // Keep the tooltip open on click/touch as well as hover or focus.
             // Prevent Radix's default click-to-close handler from overriding it.
             event.preventDefault();
-            setMode((current) => current === "pinned" ? "closed" : "pinned");
+            setMode((current) => (current === "pinned" ? "closed" : "pinned"));
           }}
           onBlur={() => setMode("closed")}
         >
           <CircleHelp aria-hidden />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side={side} sideOffset={sideOffset} align={side === "right" ? "start" : "center"}
+      <TooltipContent
+        side={side}
+        sideOffset={sideOffset}
+        align={side === "right" ? "start" : "center"}
         onEscapeKeyDown={() => setMode("closed")}
         onPointerDownOutside={() => setMode("closed")}
       >
@@ -57,7 +63,9 @@ export function HelpTooltip({
         <p className="text-background/85">{description}</p>
         {example ? (
           <div className="mt-3 border-l-2 border-background/30 pl-3">
-            <p className="mb-1 text-[10px] font-semibold tracking-wide text-background/70">Example</p>
+            <p className="mb-1 text-[10px] font-semibold tracking-wide text-background/70">
+              Example
+            </p>
             <p className="text-background/90">{example}</p>
           </div>
         ) : null}
