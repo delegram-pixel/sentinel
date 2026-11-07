@@ -1,9 +1,9 @@
 "use client";
 
 import { useFormErrorFocus } from "@/components/shared/use-form-error-focus";
+import { useAiOperationAction } from "./use-ai-operation-key";
 
 import { LoaderCircle } from "lucide-react";
-import { useActionState } from "react";
 
 import {
   generateSessionSummaryAction,
@@ -34,7 +34,7 @@ export function ReconAnalysisForm({
   conversationId: string;
   disabled: boolean;
 }) {
-  const [state, formAction, pending] = useActionState(
+  const [state, formAction, pending] = useAiOperationAction(
     runReconAnalysisAction,
     INITIAL_AI_FORM_STATE,
   );
@@ -70,7 +70,7 @@ export function HypothesisGenerationForm({
   conversationId: string;
   disabled: boolean;
 }) {
-  const [state, formAction, pending] = useActionState(
+  const [state, formAction, pending] = useAiOperationAction(
     runHypothesisGenerationAction,
     INITIAL_AI_FORM_STATE,
   );
@@ -104,7 +104,7 @@ export function AiSessionSummaryForm({
   investigationId: string;
   disabled: boolean;
 }) {
-  const [state, formAction, pending] = useActionState(
+  const [state, formAction, pending] = useAiOperationAction(
     generateSessionSummaryAction,
     INITIAL_AI_FORM_STATE,
   );

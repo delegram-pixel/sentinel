@@ -135,8 +135,33 @@ export function assetMatchesRule(
     }
     case "CIDR":
       return matchesCidr(assetHost(targetAssetIdentifier), ruleAssetIdentifier.trim());
-    case "URL_PREFIX":
-      return target.startsWith(rule);
+    case "URL_PREFIX": {
+      try {
+        const asset = new URL(targetAssetIdentifier.trim());
+        const allowed = new URL(ruleAssetIdentifier.trim());
+        if (
+          !["http:", "https:"].includes(asset.protocol) ||
+          asset.origin !== allowed.origin ||
+          asset.username ||
+          asset.password ||
+          allowed.username ||
+          allowed.password
+        )
+          return false;
+        if (/%(?:2f|5c|2e)/i.test(asset.pathname + allowed.pathname)) return false;
+        const prefix = allowed.pathname.replace(/\/+$/, "") || "/";
+        const pathMatches =
+          prefix === "/" || asset.pathname === prefix || asset.pathname.startsWith(`${prefix}/`);
+        return (
+          pathMatches &&
+          [...allowed.searchParams].every(([key, value]) =>
+            asset.searchParams.getAll(key).includes(value),
+          )
+        );
+      } catch {
+        return false;
+      }
+    }
     default:
       return false;
   }

@@ -31,14 +31,6 @@ type TextOptions = {
   spaceAfter?: number;
 };
 
-type WrappedLine = {
-  text: string;
-  font: PDFFont;
-  size: number;
-  indent: number;
-  color: ReturnType<typeof rgb>;
-};
-
 function sanitizeForPdf(value: string): string {
   return value
     .replaceAll("\u2013", "-")

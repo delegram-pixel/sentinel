@@ -15,7 +15,9 @@ describe("navigation", () => {
   });
 
   it("matches nested routes for section links", () => {
-    const projects = NAV_GROUPS[0]?.items[1];
+    const projects = NAV_GROUPS.flatMap((group) => group.items).find(
+      (item) => item.href === "/dashboard/projects",
+    );
     expect(projects).toBeDefined();
     if (!projects) {
       return;
@@ -27,7 +29,9 @@ describe("navigation", () => {
   });
 
   it("does not match a shared prefix without a separator", () => {
-    const projects = NAV_GROUPS[0]?.items[1];
+    const projects = NAV_GROUPS.flatMap((group) => group.items).find(
+      (item) => item.href === "/dashboard/projects",
+    );
     expect(projects).toBeDefined();
     if (!projects) {
       return;

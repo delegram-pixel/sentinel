@@ -22,7 +22,7 @@ export type MockAIProviderOptions = {
   outputs?: Partial<Record<AiTaskType, unknown>>;
 };
 
-function validOutput(taskType: AiTaskType): unknown {
+function validOutput(taskType: AiTaskType, request?: AiProviderRequest): unknown {
   switch (taskType) {
     case "ATTACK_SURFACE_ANALYSIS":
       return {
@@ -73,17 +73,23 @@ function validOutput(taskType: AiTaskType): unknown {
         unresolvedQuestions: ["Which observation should be validated next?"],
         nextActions: ["Record the next manual observation."],
       };
+    case "PATTERN_ANALYSIS":
+      return {
+        patterns: [],
+        claims: [],
+        uncertaintyNotes: ["The mock provider did not assess research patterns."],
+      };
     case "EVIDENCE_REVIEW":
+      return {
+        assessments: [],
+        claims: [],
+        uncertaintyNotes: ["The mock provider did not assess the evidence."],
+      };
     case "FALSE_POSITIVE_REVIEW":
       return {
-        conclusion: "NEEDS_MORE_EVIDENCE",
-        reviewSummary: "Mock review requires more evidence.",
-        supportingEvidence: [],
-        contradictoryEvidence: [],
-        missingEvidence: ["No live evidence review was performed."],
-        impactAssessment: "Unassessed.",
-        referencedObservationIds: [],
-        referencedHypothesisIds: [],
+        findings: [],
+        claims: [],
+        uncertaintyNotes: ["The mock provider did not verify any finding."],
       };
     case "FINDING_SUMMARY":
       return {
@@ -95,6 +101,26 @@ function validOutput(taskType: AiTaskType): unknown {
       };
     case "REPORT_GENERATION":
       return {
+        referencedFindingIds: [
+          ...[request?.system, ...(request?.messages.map((m) => m.content) ?? [])]
+            .join("\n")
+            .matchAll(/finding id="([a-f0-9-]{36})"/g),
+        ]
+          .map((m) => m[1])
+          .slice(0, 10),
+        referencedEvidenceIds: [],
+        claims: [
+          {
+            id: "claim-mock-limitation",
+            statement: "No live model call was made.",
+            basis: "UNKNOWN",
+            sources: [],
+            confidence: "low",
+            limitations: ["Mock output requires human replacement before external use."],
+          },
+        ],
+        assumptions: ["No live assessment was performed."],
+        missingInformation: ["A human must provide a verified report narrative."],
         title: "Mock report",
         summary: "Mock output. Configure ANTHROPIC_API_KEY for a model-generated report.",
         description: "No live model call was made.",
@@ -185,7 +211,7 @@ export class MockAIProvider implements AIProvider {
           ? schemaErrorOutput()
           : this.scenario === "unknown_reference"
             ? unknownReferenceOutput(request.taskType)
-            : (this.outputs[request.taskType] ?? validOutput(request.taskType));
+            : (this.outputs[request.taskType] ?? validOutput(request.taskType, request));
 
     return {
       structured,

@@ -8,6 +8,7 @@ import { aiModelOverrides, createAIProvider } from "@/modules/ai/infrastructure/
 import { createEvidenceStorage } from "@/modules/evidence/infrastructure/storage-factory";
 
 const chatRequestSchema = z.object({
+  operationKey: z.string().min(8).max(160),
   investigationId: z.string().uuid(),
   conversationId: z.string().uuid(),
   message: z.string().trim().min(1).max(8_000),
@@ -51,6 +52,7 @@ export async function POST(request: Request): Promise<Response> {
           parsed.data.investigationId,
           parsed.data.conversationId,
           parsed.data.message,
+          parsed.data.operationKey,
         );
 
         if (!result.ok) {

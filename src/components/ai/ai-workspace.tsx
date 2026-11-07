@@ -21,7 +21,8 @@ import { SourceLabel } from "@/components/shared/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PersistentAiTabs } from "./persistent-ai-tabs";
 import type {
   AiContextRecord,
   AiConversationDetail,
@@ -313,7 +314,11 @@ export function AiWorkspace({
           </ResearchSection>
         </aside>
         <div className="min-w-0">
-          <Tabs defaultValue={selectedConversation?.mode === "DELEGATED" ? "delegated" : "guided"}>
+          <PersistentAiTabs
+            key={selectedConversation?.id ?? "new-session"}
+            conversationId={selectedConversation?.id}
+            mode={selectedConversation?.mode ?? "GUIDED"}
+          >
             <TabsList aria-label="Research assistance mode">
               <TabsTrigger value="guided">Guided mode</TabsTrigger>
               <TabsTrigger value="delegated">Delegated mode</TabsTrigger>
@@ -373,6 +378,11 @@ export function AiWorkspace({
                         review.
                       </p>
                       <ReconAnalysisForm
+                        key={
+                          tasks.find(
+                            (t) => t.taskType === "RECON_ANALYSIS" && t.status === "COMPLETED",
+                          )?.id ?? "initial-recon"
+                        }
                         investigationId={investigationId}
                         conversationId={selectedConversation?.id ?? ""}
                         disabled={archived}
@@ -384,6 +394,12 @@ export function AiWorkspace({
                         information.
                       </p>
                       <HypothesisGenerationForm
+                        key={
+                          tasks.find(
+                            (t) =>
+                              t.taskType === "HYPOTHESIS_GENERATION" && t.status === "COMPLETED",
+                          )?.id ?? "initial-hypothesis"
+                        }
                         investigationId={investigationId}
                         conversationId={selectedConversation?.id ?? ""}
                         disabled={archived}
@@ -393,7 +409,15 @@ export function AiWorkspace({
                       <p className="text-sm text-text-secondary">
                         Save an AI-generated summary of completed work and suggested next actions.
                       </p>
-                      <AiSessionSummaryForm investigationId={investigationId} disabled={archived} />
+                      <AiSessionSummaryForm
+                        key={
+                          tasks.find(
+                            (t) => t.taskType === "SESSION_SUMMARY" && t.status === "COMPLETED",
+                          )?.id ?? "initial-summary"
+                        }
+                        investigationId={investigationId}
+                        disabled={archived}
+                      />
                     </div>
                   </div>
                 </ResearchSection>
@@ -409,7 +433,11 @@ export function AiWorkspace({
                         <h3 className="mb-4 text-base font-medium">
                           {AI_TASK_TYPE_LABELS[task.taskType]}
                         </h3>
-                        <ResearchOutput output={task.output} investigationId={investigationId} />
+                        <ResearchOutput
+                          output={task.output}
+                          investigationId={investigationId}
+                          sourceTaskId={task.id}
+                        />
                         <div className="mt-5 flex flex-wrap items-center gap-4">
                           <EvidenceReference id={task.id} label="Task" />
                           <Button asChild variant="outline" size="sm">
@@ -429,7 +457,7 @@ export function AiWorkspace({
                 </ResearchSection>
               </div>
             </TabsContent>
-          </Tabs>
+          </PersistentAiTabs>
         </div>
       </div>
       <TaskHistory tasks={tasks} />

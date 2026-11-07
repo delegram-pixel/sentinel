@@ -65,6 +65,7 @@ describe("finding lifecycle", () => {
           fileSize: 2048,
           checksum: "a".repeat(64),
           redactionStatus: "VERIFIED_SAFE",
+          uploadValidatedAt: tenancy.now,
           redactionMethod: "HUMAN_REVIEW",
           uploadedBy: tenancy.user.id,
           activatedAt: tenancy.now,

@@ -1,4 +1,5 @@
 import "server-only";
+import { z } from "zod";
 
 import { AiError } from "../domain/ai-errors";
 
@@ -6,6 +7,29 @@ import type { AIProvider, AiProviderRequest, AiProviderResponse } from "../appli
 
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
+const responseSchema = z
+  .object({
+    id: z.string().optional(),
+    content: z.array(
+      z
+        .object({
+          type: z.string(),
+          text: z.string().optional(),
+          id: z.string().optional(),
+          name: z.string().optional(),
+          input: z.unknown().optional(),
+        })
+        .passthrough(),
+    ),
+    stop_reason: z.string().nullable(),
+    usage: z
+      .object({
+        input_tokens: z.number().int().nonnegative(),
+        output_tokens: z.number().int().nonnegative(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
 
 type AnthropicContentBlock =
   | { type: "text"; text: string }
@@ -85,11 +109,13 @@ export class AnthropicProvider implements AIProvider {
         throw await this.errorForResponse(response);
       }
 
-      const payload = (await response.json()) as AnthropicResponse;
-
-      if (payload.stop_reason === "refusal") {
-        throw new AiError("AI_REFUSAL");
-      }
+      const parsed = responseSchema.safeParse(await response.json());
+      if (!parsed.success)
+        throw new AiError(
+          "AI_INVALID_OUTPUT",
+          "The provider response envelope or usage was invalid.",
+        );
+      const payload = parsed.data;
 
       const text = (payload.content ?? [])
         .filter((block): block is { type: "text"; text: string } => block.type === "text")
@@ -97,12 +123,24 @@ export class AnthropicProvider implements AIProvider {
         .join("\n")
         .trim();
 
+      const tools = payload.content.filter((block) => block.type === "tool_use");
+      if (
+        request.structuredOutput &&
+        tools.some((block) => block.name !== request.structuredOutput?.toolName)
+      )
+        throw new AiError("AI_INVALID_OUTPUT", "The provider returned an unexpected tool result.");
+      if (tools.length > 1)
+        throw new AiError(
+          "AI_INVALID_OUTPUT",
+          "The provider returned multiple structured results.",
+        );
       const toolUse = (payload.content ?? []).find(
         (block): block is { type: "tool_use"; id: string; name: string; input: unknown } =>
           block.type === "tool_use",
       );
 
       return {
+        providerRequestId: payload.id ?? response.headers.get("request-id") ?? undefined,
         text,
         structured: toolUse?.input ?? null,
         usage: {

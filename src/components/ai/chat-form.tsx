@@ -2,7 +2,7 @@
 
 import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -42,6 +42,7 @@ export function ChatForm({
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const operation = useRef<{ message: string; key: string; conversationId: string } | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,12 +53,22 @@ export function ChatForm({
 
     setPending(true);
     setError(null);
+    if (
+      operation.current?.message !== message ||
+      operation.current.conversationId !== conversationId
+    )
+      operation.current = { message, key: crypto.randomUUID(), conversationId };
 
     try {
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ investigationId, conversationId, message }),
+        body: JSON.stringify({
+          investigationId,
+          conversationId,
+          message,
+          operationKey: operation.current.key,
+        }),
       });
 
       if (!response.ok) {
@@ -75,6 +86,7 @@ export function ChatForm({
       const decoder = new TextDecoder();
       let buffer = "";
       let failed = false;
+      let completed = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -98,11 +110,15 @@ export function ChatForm({
             setError(event.message);
             failed = true;
           }
+          if (event.type === "complete") completed = true;
         }
       }
 
-      if (!failed) {
+      if (!failed && completed) {
         setMessage("");
+        operation.current = null;
+      } else if (!failed) {
+        setError("The stream ended before completion. Check task history or retry this question.");
       }
     } catch {
       setError("The chat request could not be completed.");

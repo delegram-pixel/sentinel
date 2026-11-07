@@ -57,6 +57,19 @@ describe("scope asset matching", () => {
     ).toBe(false);
   });
 
+  it.each([
+    "https://example.com.evil.test/api",
+    "https://example.com/api-other",
+    "http://example.com/api",
+    "https://example.com:8443/api",
+    "https://example.com/API",
+    "https://example.com/api/%2e%2e/admin",
+    "https://user@example.com/api",
+    "https://example.com/api%2fadmin",
+  ])("rejects a URL outside the allowed origin/path boundary: %s", (asset) => {
+    expect(assetMatchesRule(asset, "https://example.com/api", "URL_PREFIX")).toBe(false);
+  });
+
   it("matches IPv4 CIDR ranges and rejects outside addresses", () => {
     expect(matchesCidr("10.0.0.5", "10.0.0.0/24")).toBe(true);
     expect(matchesCidr("10.0.1.5", "10.0.0.0/24")).toBe(false);

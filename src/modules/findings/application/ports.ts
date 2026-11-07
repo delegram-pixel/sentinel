@@ -110,6 +110,7 @@ export type FindingCreateData = {
 };
 
 export type FindingUpdateData = {
+  expectedUpdatedAt?: Date;
   hypothesisId?: string | null;
   title: string;
   titleNormalized: string;
@@ -122,6 +123,7 @@ export type FindingUpdateData = {
 };
 
 export type FindingSeverityData = {
+  expectedUpdatedAt?: Date;
   severity: Severity;
   severityRationale?: string | null;
   affectedAsset?: string | null;
@@ -131,6 +133,8 @@ export type FindingSeverityData = {
 };
 
 export type FindingTransitionData = {
+  rationale?: string;
+  expectedUpdatedAt?: Date;
   status: FindingStatus;
   resolutionReason?: ResolutionReason | null;
   approvedBy?: string | null;
@@ -139,6 +143,7 @@ export type FindingTransitionData = {
 };
 
 export type VerificationReviewCreateData = {
+  expectedUpdatedAt?: Date;
   findingId: string;
   taskId?: string | null;
   reviewerType: VerificationReviewerType;

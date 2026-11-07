@@ -1,6 +1,9 @@
 import "server-only";
 
 import { Prisma } from "@/generated/prisma/client";
+import { guardReportSnapshot } from "./report-snapshot-guard";
+import { ResearchOperationError, canReviewResearch } from "@/modules/shared/application/actor";
+import { requireResearchMember } from "@/modules/shared/infrastructure/research-transaction";
 
 import type { AuditEvent } from "@/modules/audit/domain/audit";
 import type {
@@ -87,6 +90,7 @@ const reportDetailSelect = {
       evidenceSnapshot: true,
       findingSnapshot: true,
       generatedByType: true,
+      sourceTaskId: true,
       model: true,
       promptVersion: true,
       createdBy: true,
@@ -99,6 +103,7 @@ type ReportDetailRecord = Prisma.ReportGetPayload<{ select: typeof reportDetailS
 
 const reportFindingSelect = {
   id: true,
+  updatedAt: true,
   title: true,
   description: true,
   status: true,
@@ -189,6 +194,7 @@ function mapRevision(record: ReportDetailRecord["revisions"][number]): ReportRev
     evidenceSnapshot: evidenceSnapshots(record.evidenceSnapshot),
     findingSnapshot: findingSnapshots(record.findingSnapshot),
     generatedByType: record.generatedByType as ReportRevisionRow["generatedByType"],
+    sourceTaskId: record.sourceTaskId,
     model: record.model,
     promptVersion: record.promptVersion,
     createdBy: record.createdBy,
@@ -244,6 +250,7 @@ function mapReportTemplate(record: ReportTemplateRecord): ReportTemplateRow {
 function mapReportFinding(record: ReportFindingRecord): ReportFindingInput {
   return {
     id: record.id,
+    sourceUpdatedAt: record.updatedAt.toISOString(),
     title: record.title,
     description: record.description,
     status: record.status as FindingStatus,
@@ -511,6 +518,19 @@ export class PrismaReportStore implements ReportStore {
 
   async createReport(data: ReportCreateData, audit: ReportAuditDraft): Promise<ReportDetail> {
     const reportId = await this.db.$transaction(async (tx) => {
+      if (
+        !(await guardReportSnapshot(
+          tx,
+          { workspaceId: audit.workspaceId, userId: audit.userId, role: "RESEARCHER" },
+          data.investigationId,
+          data.findingSnapshot,
+          data.evidenceSnapshot,
+        ))
+      )
+        throw new ResearchOperationError(
+          "REPORT_SOURCE_CHANGED",
+          "Report sources changed. Refresh before creating this report.",
+        );
       const investigation = await tx.investigation.findFirst({
         where: { id: data.investigationId, workspaceId: data.workspaceId },
         select: { id: true },
@@ -586,15 +606,38 @@ export class PrismaReportStore implements ReportStore {
     audit: ReportAuditDraft,
   ): Promise<ReportDetail | null> {
     const created = await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "Report" WHERE id = ${reportId}::uuid AND "workspaceId" = ${workspaceId}::uuid FOR UPDATE`,
+      );
       const existing = await tx.report.findFirst({
         where: { id: reportId, workspaceId },
-        select: { id: true },
+        select: {
+          id: true,
+          status: true,
+          investigationId: true,
+          revisions: { orderBy: { version: "desc" }, take: 1, select: { version: true } },
+        },
       });
 
-      if (!existing) {
+      if (
+        !existing ||
+        data.expectedStatus !== existing.status ||
+        data.expectedRevision !== (existing.revisions[0]?.version ?? 0)
+      ) {
         return false;
       }
 
+      if (existing.status !== "DRAFT") return false;
+      if (
+        !(await guardReportSnapshot(
+          tx,
+          { workspaceId, userId: audit.userId, role: "RESEARCHER" },
+          existing.investigationId,
+          data.findingSnapshot,
+          data.evidenceSnapshot,
+        ))
+      )
+        return false;
       const latest = await tx.reportRevision.findFirst({
         where: { reportId },
         orderBy: { version: "desc" },
@@ -609,6 +652,7 @@ export class PrismaReportStore implements ReportStore {
           evidenceSnapshot: data.evidenceSnapshot as unknown as Prisma.InputJsonValue,
           findingSnapshot: data.findingSnapshot as unknown as Prisma.InputJsonValue,
           generatedByType: data.generatedByType,
+          sourceTaskId: data.sourceTaskId ?? null,
           model: data.model ?? null,
           promptVersion: data.promptVersion ?? null,
           createdBy: data.createdBy,
@@ -635,15 +679,51 @@ export class PrismaReportStore implements ReportStore {
     audit: ReportAuditDraft,
   ): Promise<ReportDetail | null> {
     const updated = await this.db.$transaction(async (tx) => {
+      const role = await requireResearchMember(tx, {
+        workspaceId,
+        userId: audit.userId,
+        role: "RESEARCHER",
+      });
+      if (data.status === "APPROVED" && !canReviewResearch(role))
+        throw new ResearchOperationError("FORBIDDEN", "A human reviewer must approve this report.");
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "Report" WHERE id = ${reportId}::uuid AND "workspaceId" = ${workspaceId}::uuid FOR UPDATE`,
+      );
       const existing = await tx.report.findFirst({
         where: { id: reportId, workspaceId },
-        select: { id: true },
+        select: {
+          id: true,
+          status: true,
+          investigationId: true,
+          revisions: { orderBy: { version: "desc" }, take: 1, select: { version: true } },
+        },
       });
 
-      if (!existing) {
+      if (
+        !existing ||
+        data.expectedStatus !== existing.status ||
+        data.expectedRevision !== (existing.revisions[0]?.version ?? 0)
+      ) {
         return false;
       }
 
+      if (data.status === "APPROVED" || data.status === "UNDER_REVIEW") {
+        const snapshot = await tx.reportRevision.findFirst({
+          where: { reportId },
+          orderBy: { version: "desc" },
+        });
+        if (
+          !snapshot ||
+          !(await guardReportSnapshot(
+            tx,
+            { workspaceId, userId: audit.userId, role },
+            existing.investigationId,
+            findingSnapshots(snapshot.findingSnapshot),
+            evidenceSnapshots(snapshot.evidenceSnapshot),
+          ))
+        )
+          return false;
+      }
       await tx.report.update({
         where: { id: reportId },
         data: {

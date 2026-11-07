@@ -51,9 +51,9 @@ describe("AI task configuration", () => {
     });
   });
 
-  it("fails closed for task types without a prompt", () => {
-    expect(AI_TASK_PROFILES.EVIDENCE_REVIEW.promptId).toBeNull();
-    expect(AI_TASK_PROFILES.REPORT_GENERATION.promptId).toBeNull();
+  it("registers evidence and reporting agents with their task profiles", () => {
+    expect(AI_TASK_PROFILES.EVIDENCE_REVIEW.promptId).toBe("evidence.analysis");
+    expect(AI_TASK_PROFILES.REPORT_GENERATION.promptId).toBe("reporting.draft");
     expect(AI_TASK_PROFILES.RECON_ANALYSIS.promptId).not.toBeNull();
   });
 });

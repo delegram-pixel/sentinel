@@ -1,11 +1,12 @@
 "use client";
 
 import { Menu } from "lucide-react";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { SheetTrigger } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function Header({
   workspaceName,
@@ -26,7 +27,9 @@ export function Header({
           <Menu data-icon="inline-start" aria-hidden />
         </Button>
       </SheetTrigger>
-      <Breadcrumbs />
+      <Suspense fallback={<Skeleton className="h-4 w-28" />}>
+        <Breadcrumbs />
+      </Suspense>
       <div className="ml-auto flex shrink-0 items-center gap-5">
         <div className="hidden max-w-64 truncate text-xs text-text-secondary md:block">
           {workspaceName ?? "Workspace"}

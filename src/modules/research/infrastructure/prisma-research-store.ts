@@ -183,6 +183,8 @@ const investigationBaseSelect = {
 
 const investigationDetailSelect = {
   ...investigationBaseSelect,
+  engagementId: true,
+  phase: true,
   observations: { orderBy: { createdAt: "asc" }, select: observationSelect },
   hypotheses: { orderBy: { updatedAt: "desc" }, select: hypothesisDetailSelect },
   sessionSummaries: { orderBy: { createdAt: "desc" }, select: sessionSummarySelect },
@@ -328,6 +330,8 @@ function mapInvestigationBase(investigation: {
 function mapInvestigationDetail(investigation: InvestigationDetailRecord): InvestigationDetail {
   return {
     ...mapInvestigationBase(investigation),
+    engagementId: investigation.engagementId,
+    phase: investigation.phase,
     observations: investigation.observations.map(mapObservation),
     hypotheses: investigation.hypotheses.map(mapHypothesis),
     summaries: investigation.sessionSummaries.map(mapSessionSummary),

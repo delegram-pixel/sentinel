@@ -1,3 +1,5 @@
+import { researchOperation } from "@/modules/shared/application/actor";
+import { removeResearchEvidenceLink } from "@/modules/evidence/application/relationship-service";
 import { createHash, randomUUID } from "node:crypto";
 
 import { failure, type DomainResult } from "@/modules/shared/domain/result";
@@ -74,7 +76,11 @@ function assertEditable(context: {
  * uploader, the workspace owner, and reviewers who must resolve it.
  */
 function canView(actor: EvidenceActor, evidence: EvidenceRow): boolean {
-  return isReviewer(actor.role) || evidence.uploadedBy === actor.userId;
+  return (
+    isApprovedEvidence(evidence.redactionStatus) ||
+    isReviewer(actor.role) ||
+    evidence.uploadedBy === actor.userId
+  );
 }
 
 export async function listEvidence(
@@ -420,8 +426,6 @@ export async function reviewEvidenceRedaction(
   }
 
   if (parsed.data.decision === "REJECT") {
-    await storage.deleteObject(evidence.quarantineKey);
-
     const rejected = await store.rejectEvidence(
       actor.workspaceId,
       evidenceId,
@@ -434,12 +438,28 @@ export async function reviewEvidenceRedaction(
       }),
     );
 
+    if (rejected) {
+      try {
+        await storage.deleteObject(evidence.quarantineKey);
+      } catch {
+        /* The recorded cleanup job retains the original key and retries. */
+      }
+    }
+
     return rejected
       ? { ok: true, value: { id: rejected.id, redactionStatus: rejected.redactionStatus } }
       : failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
   }
 
-  const nextStatus = parsed.data.decision === "APPROVE_REDACTED" ? "REDACTED" : "VERIFIED_SAFE";
+  if (!evidence.uploadValidatedAt) {
+    return failure(
+      "UPLOAD_NOT_VALIDATED",
+      "Finalize and validate the uploaded evidence before approving it.",
+    );
+  }
+
+  const nextStatus: "REDACTED" | "VERIFIED_SAFE" =
+    parsed.data.decision === "APPROVE_REDACTED" ? "REDACTED" : "VERIFIED_SAFE";
   const destination = activeStorageKey(
     actor.workspaceId,
     evidence.investigationId,
@@ -447,13 +467,29 @@ export async function reviewEvidenceRedaction(
     evidence.version,
   );
 
-  await storage.copyObject(evidence.quarantineKey, destination);
+  const activationData = {
+    storageKey: destination,
+    expectedChecksum: evidence.checksum,
+    expectedVersion: evidence.version,
+    redactionStatus: nextStatus,
+    redactionMethod: "HUMAN_REVIEW" as const,
+    redactionReviewedBy: actor.userId,
+    redactionReviewedAt: now,
+    activatedAt: now,
+  };
+  await store.prepareActivation(actor, evidenceId, activationData);
+  try {
+    await storage.copyObject(evidence.quarantineKey, destination);
+  } catch {
+    return failure(
+      "EVIDENCE_ACTIVATION_RETRY_QUEUED",
+      "The reviewed promotion is recorded and queued for a storage retry. The quarantined original is retained.",
+    );
+  }
 
   const copy = await storage.getObject(destination);
 
   if (!copy || createHash("sha256").update(copy.body).digest("hex") !== evidence.checksum) {
-    await storage.deleteObject(destination);
-
     return failure(
       "EVIDENCE_ACTIVATION_FAILED",
       "The stored object failed verification and was not activated.",
@@ -463,14 +499,7 @@ export async function reviewEvidenceRedaction(
   const activated = await store.activateEvidence(
     actor.workspaceId,
     evidenceId,
-    {
-      storageKey: destination,
-      redactionStatus: nextStatus,
-      redactionMethod: "HUMAN_REVIEW",
-      redactionReviewedBy: actor.userId,
-      redactionReviewedAt: now,
-      activatedAt: now,
-    },
+    activationData,
     auditDraft(actor, "EVIDENCE_REDACTION_REVIEWED", "Evidence", {
       previousValue: { redactionStatus: evidence.redactionStatus },
       newValue: {
@@ -485,12 +514,21 @@ export async function reviewEvidenceRedaction(
   );
 
   if (!activated) {
-    await storage.deleteObject(destination);
-
+    const current = await store.findEvidence(actor.workspaceId, evidenceId);
+    if (
+      current?.storageKey === destination &&
+      current.redactionStatus === nextStatus &&
+      current.redactionReviewedBy === actor.userId
+    )
+      return { ok: true, value: { id: current.id, redactionStatus: current.redactionStatus } };
     return failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
   }
 
-  await storage.deleteObject(evidence.quarantineKey);
+  try {
+    await storage.deleteObject(evidence.quarantineKey);
+  } catch {
+    /* The promotion job retries cleanup after the verified activation. */
+  }
 
   return { ok: true, value: { id: activated.id, redactionStatus: activated.redactionStatus } };
 }
@@ -523,23 +561,29 @@ export async function deleteEvidence(
     return failure("EVIDENCE_IN_USE", "Remove the evidence from its findings before deleting it.");
   }
 
-  if (evidence.storageKey) {
-    await storage.deleteObject(evidence.storageKey);
-  }
-
-  if (evidence.quarantineKey) {
-    await storage.deleteObject(evidence.quarantineKey);
-  }
-
-  const deleted = await store.softDeleteEvidence(
-    actor.workspaceId,
-    evidenceId,
-    now,
-    auditDraft(actor, "EVIDENCE_DELETED", "Evidence", {
-      previousValue: { redactionStatus: evidence.redactionStatus },
-      newValue: { deleted: true },
-    }),
+  const deletion = await researchOperation(() =>
+    store.softDeleteEvidence(
+      actor.workspaceId,
+      evidenceId,
+      now,
+      auditDraft(actor, "EVIDENCE_DELETED", "Evidence", {
+        previousValue: { redactionStatus: evidence.redactionStatus },
+        newValue: { deleted: true },
+      }),
+    ),
   );
+
+  if (!deletion.ok) return deletion;
+  const deleted = deletion.value;
+  if (deleted) {
+    if (evidence.storageKey) {
+      await storage.deleteObject(evidence.storageKey);
+    }
+
+    if (evidence.quarantineKey) {
+      await storage.deleteObject(evidence.quarantineKey);
+    }
+  }
 
   return deleted
     ? { ok: true, value: { id: evidenceId } }
@@ -643,15 +687,11 @@ export async function removeEvidenceLink(
   actor: EvidenceActor,
   linkId: string,
 ): Promise<DomainResult<true>> {
-  const removed = await store.removeLink(
-    actor.workspaceId,
-    linkId,
-    auditDraft(actor, "EVIDENCE_LINK_REMOVED", "EvidenceLink", {
-      previousValue: { linkId },
-    }),
+  return removeResearchEvidenceLink(() =>
+    store.removeLink(
+      actor.workspaceId,
+      linkId,
+      auditDraft(actor, "EVIDENCE_LINK_REMOVED", "EvidenceLink", { previousValue: { linkId } }),
+    ),
   );
-
-  return removed
-    ? { ok: true, value: true }
-    : failure("EVIDENCE_LINK_NOT_FOUND", "That evidence link does not exist.");
 }

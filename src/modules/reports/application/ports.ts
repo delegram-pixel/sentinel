@@ -44,6 +44,7 @@ export type ReportInvestigationOption = {
 };
 
 export type ReportEvidenceSnapshot = {
+  findingId?: string;
   evidenceId: string;
   title: string;
   evidenceType: EvidenceType;
@@ -54,6 +55,7 @@ export type ReportEvidenceSnapshot = {
 };
 
 export type ReportFindingSnapshot = {
+  sourceUpdatedAt?: string;
   findingId: string;
   title: string;
   status: FindingStatus;
@@ -109,6 +111,7 @@ export type ReportRow = {
 };
 
 export type ReportRevisionRow = {
+  sourceTaskId?: string | null;
   id: string;
   reportId: string;
   version: number;
@@ -147,6 +150,9 @@ export type ReportCreateData = {
 };
 
 export type ReportRevisionData = {
+  sourceTaskId?: string | null;
+  expectedRevision?: number;
+  expectedStatus?: ReportStatus;
   content: string;
   evidenceSnapshot: ReportEvidenceSnapshot[];
   findingSnapshot: ReportFindingSnapshot[];
@@ -157,6 +163,8 @@ export type ReportRevisionData = {
 };
 
 export type ReportTransitionData = {
+  expectedRevision?: number;
+  expectedStatus?: ReportStatus;
   status: ReportStatus;
   approvedBy?: string | null;
   approvedAt?: Date | null;

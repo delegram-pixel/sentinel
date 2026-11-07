@@ -1,6 +1,18 @@
 import "server-only";
+import { assertEvidenceNotReferenced } from "./evidence-retention";
+import {
+  createEvidenceRelationship,
+  removeEvidenceRelationship,
+} from "./prisma-evidence-relationships";
 
 import { Prisma } from "@/generated/prisma/client";
+import {
+  requireResearchMember,
+  lockResearchInvestigation,
+} from "@/modules/shared/infrastructure/research-transaction";
+import { canReviewResearch, ResearchOperationError } from "@/modules/shared/application/actor";
+import type { ResearchActor } from "@/modules/shared/application/actor";
+import { PrismaJobStore } from "@/modules/tasks/infrastructure/prisma-job-store";
 
 import type { AuditEvent } from "@/modules/audit/domain/audit";
 import type { FindingStatus } from "@/modules/findings/domain/finding-status";
@@ -36,6 +48,8 @@ const evidenceBaseSelect = {
   fileSize: true,
   checksum: true,
   source: true,
+  collector: true,
+  collectedAt: true,
   redactionStatus: true,
   redactionMethod: true,
   scanFindings: true,
@@ -43,6 +57,7 @@ const evidenceBaseSelect = {
   redactionReviewedBy: true,
   redactionReviewedAt: true,
   activatedAt: true,
+  uploadValidatedAt: true,
   version: true,
   supersedesId: true,
   deletedAt: true,
@@ -94,6 +109,8 @@ function mapEvidence(record: EvidenceBaseRecord): EvidenceRow {
     fileSize: record.fileSize,
     checksum: record.checksum,
     source: record.source,
+    collector: record.collector,
+    collectedAt: record.collectedAt,
     redactionStatus: record.redactionStatus as RedactionStatus,
     redactionMethod: record.redactionMethod,
     scanFindings: record.scanFindings,
@@ -101,6 +118,7 @@ function mapEvidence(record: EvidenceBaseRecord): EvidenceRow {
     redactionReviewedBy: record.redactionReviewedBy,
     redactionReviewedAt: record.redactionReviewedAt,
     activatedAt: record.activatedAt,
+    uploadValidatedAt: record.uploadValidatedAt,
     version: record.version,
     supersedesId: record.supersedesId,
     deletedAt: record.deletedAt,
@@ -123,6 +141,71 @@ function mapLink(link: EvidenceLinkRecord): EvidenceFindingLinkRow {
 
 export class PrismaEvidenceStore implements EvidenceStore {
   constructor(private readonly db: Db) {}
+  prepareActivation(actor: ResearchActor, evidenceId: string, data: EvidenceActivationData) {
+    return this.db.$transaction(async (tx) => {
+      if (!canReviewResearch(await requireResearchMember(tx, actor)))
+        throw new ResearchOperationError(
+          "FORBIDDEN",
+          "A human reviewer must record evidence promotion.",
+        );
+      const source = await tx.evidence.findFirst({
+        where: { id: evidenceId, workspaceId: actor.workspaceId },
+        select: { investigationId: true },
+      });
+      if (!source) throw new ResearchOperationError("NOT_FOUND", "The evidence is unavailable.");
+      await lockResearchInvestigation(tx, actor, source.investigationId);
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "Evidence" WHERE id = ${evidenceId}::uuid FOR UPDATE`,
+      );
+      const evidence = await tx.evidence.findFirst({
+        where: {
+          id: evidenceId,
+          workspaceId: actor.workspaceId,
+          deletedAt: null,
+          storageKey: null,
+          uploadValidatedAt: { not: null },
+        },
+      });
+      if (
+        !evidence?.quarantineKey ||
+        evidence.checksum !== data.expectedChecksum ||
+        evidence.version !== data.expectedVersion
+      )
+        throw new ResearchOperationError(
+          "CONFLICT",
+          "The validated upload changed. Refresh before approving it.",
+        );
+      const operationKey = `promotion:${evidence.id}:v${evidence.version}`;
+      const old = await tx.backgroundJob.findUnique({
+        where: { workspaceId_operationKey: { workspaceId: actor.workspaceId, operationKey } },
+      });
+      if (old) {
+        const payload = old.payload as { decision?: string; checksum?: string };
+        if (
+          old.requestedBy !== actor.userId ||
+          payload.decision !== data.redactionStatus ||
+          payload.checksum !== evidence.checksum ||
+          old.status === "CANCELLED"
+        )
+          throw new ResearchOperationError(
+            "CONFLICT",
+            "A different promotion review is already recorded. Review its background work.",
+          );
+        return { id: old.id };
+      }
+      return new PrismaJobStore(tx).enqueue(actor, "EVIDENCE_PROMOTION", operationKey, {
+        evidenceId,
+        sourceKey: evidence.quarantineKey,
+        destinationKey: data.storageKey,
+        decision: data.redactionStatus,
+        checksum: evidence.checksum,
+        version: evidence.version,
+        fileSize: evidence.fileSize,
+        mimeType: evidence.mimeType,
+        reviewedAt: data.redactionReviewedAt.toISOString(),
+      });
+    });
+  }
 
   async findInvestigation(workspaceId: string, investigationId: string) {
     const investigation = await this.db.investigation.findFirst({
@@ -246,7 +329,13 @@ export class PrismaEvidenceStore implements EvidenceStore {
   ): Promise<EvidenceRow | null> {
     return this.db.$transaction(async (tx) => {
       const existing = await tx.evidence.findFirst({
-        where: { id: evidenceId, workspaceId },
+        where: {
+          id: evidenceId,
+          workspaceId,
+          storageKey: null,
+          deletedAt: null,
+          uploadValidatedAt: null,
+        },
         select: { id: true },
       });
 
@@ -260,6 +349,7 @@ export class PrismaEvidenceStore implements EvidenceStore {
           mimeType: data.mimeType,
           fileSize: data.fileSize,
           checksum: data.checksum,
+          uploadValidatedAt: new Date(),
           scanFindings: data.scanFindings as Prisma.InputJsonValue,
           redactionStatus: data.redactionStatus,
         },
@@ -279,8 +369,92 @@ export class PrismaEvidenceStore implements EvidenceStore {
     audit: EvidenceAuditDraft,
   ): Promise<EvidenceRow | null> {
     return this.db.$transaction(async (tx) => {
-      const existing = await tx.evidence.findFirst({
+      if (
+        !canReviewResearch(
+          await requireResearchMember(tx, {
+            workspaceId,
+            userId: audit.userId,
+            role: "RESEARCHER",
+          }),
+        )
+      )
+        throw new ResearchOperationError(
+          "FORBIDDEN",
+          "A current human reviewer must approve evidence promotion.",
+        );
+      const source = await tx.evidence.findFirst({
         where: { id: evidenceId, workspaceId },
+        select: { investigationId: true, version: true },
+      });
+      if (!source) return null;
+      await lockResearchInvestigation(
+        tx,
+        { workspaceId, userId: audit.userId, role: "RESEARCHER" },
+        source.investigationId,
+      );
+      if (data.executionLease) {
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "BackgroundJob" WHERE id = ${data.executionLease.jobId}::uuid FOR UPDATE`,
+        );
+        if (
+          !(await tx.backgroundJob.findFirst({
+            where: {
+              id: data.executionLease.jobId,
+              workspaceId,
+              status: "RUNNING",
+              leaseToken: data.executionLease.token,
+              leaseUntil: { gt: new Date() },
+              cancelRequestedAt: null,
+            },
+          }))
+        )
+          return null;
+      } else {
+        const promotion = await tx.backgroundJob.findUnique({
+          where: {
+            workspaceId_operationKey: {
+              workspaceId,
+              operationKey: `promotion:${evidenceId}:v${source.version}`,
+            },
+          },
+        });
+        if (!promotion) return null;
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "BackgroundJob" WHERE id = ${promotion.id}::uuid FOR UPDATE`,
+        );
+        const current = await tx.backgroundJob.findFirst({
+          where: {
+            id: promotion.id,
+            workspaceId,
+            requestedBy: audit.userId,
+            kind: "EVIDENCE_PROMOTION",
+            status: { in: ["QUEUED", "RUNNING"] },
+            cancelRequestedAt: null,
+          },
+        });
+        const payload = current?.payload as
+          { destinationKey?: string; checksum?: string; decision?: string } | undefined;
+        if (
+          !current ||
+          payload?.destinationKey !== data.storageKey ||
+          payload?.checksum !== data.expectedChecksum ||
+          payload?.decision !== data.redactionStatus
+        )
+          return null;
+      }
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "Evidence" WHERE id = ${evidenceId}::uuid AND "workspaceId" = ${workspaceId}::uuid FOR UPDATE`,
+      );
+      const existing = await tx.evidence.findFirst({
+        where: {
+          id: evidenceId,
+          workspaceId,
+          uploadValidatedAt: { not: null },
+          storageKey: null,
+          deletedAt: null,
+          ...(data.expectedChecksum ? { checksum: data.expectedChecksum } : {}),
+          ...(data.expectedVersion ? { version: data.expectedVersion } : {}),
+        },
         select: { id: true },
       });
 
@@ -316,19 +490,42 @@ export class PrismaEvidenceStore implements EvidenceStore {
     audit: EvidenceAuditDraft,
   ): Promise<EvidenceRow | null> {
     return this.db.$transaction(async (tx) => {
+      if (
+        !canReviewResearch(
+          await requireResearchMember(tx, {
+            workspaceId,
+            userId: audit.userId,
+            role: "RESEARCHER",
+          }),
+        )
+      )
+        throw new ResearchOperationError("FORBIDDEN", "A human reviewer must reject evidence.");
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "Evidence" WHERE id = ${evidenceId}::uuid AND "workspaceId" = ${workspaceId}::uuid FOR UPDATE`,
+      );
       const existing = await tx.evidence.findFirst({
-        where: { id: evidenceId, workspaceId },
-        select: { id: true },
+        where: { id: evidenceId, workspaceId, storageKey: null, deletedAt: null },
+        select: { id: true, quarantineKey: true, investigationId: true },
       });
 
       if (!existing) {
         return null;
       }
+      await lockResearchInvestigation(
+        tx,
+        { workspaceId, userId: audit.userId, role: "RESEARCHER" },
+        existing.investigationId,
+      );
+      await new PrismaJobStore(tx).enqueue(
+        { workspaceId, userId: audit.userId, role: "RESEARCHER" },
+        "EVIDENCE_CLEANUP",
+        `rejection:${evidenceId}`,
+        { evidenceId, quarantineKey: existing.quarantineKey },
+      );
 
       const evidence = await tx.evidence.update({
         where: { id: evidenceId },
         data: {
-          quarantineKey: null,
           redactionStatus: "QUARANTINED",
           redactionReviewedBy: audit.userId,
           redactionReviewedAt: now,
@@ -352,6 +549,10 @@ export class PrismaEvidenceStore implements EvidenceStore {
     audit: EvidenceAuditDraft,
   ): Promise<boolean> {
     return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "Evidence" WHERE id = ${evidenceId}::uuid AND "workspaceId" = ${workspaceId}::uuid FOR UPDATE`,
+      );
+      await assertEvidenceNotReferenced(tx, workspaceId, evidenceId);
       const existing = await tx.evidence.findFirst({
         where: { id: evidenceId, workspaceId },
         select: { id: true },
@@ -367,6 +568,19 @@ export class PrismaEvidenceStore implements EvidenceStore {
         select: { id: true },
       });
       await tx.auditLog.create({ data: auditRow(audit, evidenceId) });
+      await tx.backgroundJob.upsert({
+        where: {
+          workspaceId_operationKey: { workspaceId, operationKey: `evidence-cleanup:${evidenceId}` },
+        },
+        create: {
+          workspaceId,
+          requestedBy: audit.userId,
+          kind: "EVIDENCE_CLEANUP",
+          operationKey: `evidence-cleanup:${evidenceId}`,
+          payload: { evidenceId },
+        },
+        update: {},
+      });
 
       return true;
     });
@@ -423,45 +637,9 @@ export class PrismaEvidenceStore implements EvidenceStore {
     data: EvidenceLinkCreateData,
     audit: EvidenceAuditDraft,
   ): Promise<EvidenceFindingLinkRow> {
-    return this.db.$transaction(async (tx) => {
-      const evidence = await tx.evidence.findFirst({
-        where: { id: data.evidenceId, workspaceId: data.workspaceId, deletedAt: null },
-        select: { id: true, investigationId: true, redactionStatus: true },
-      });
-      const finding = await tx.finding.findFirst({
-        where: { id: data.findingId, workspaceId: data.workspaceId },
-        select: { id: true, investigationId: true, status: true },
-      });
-
-      if (!evidence || !finding) {
-        throw new Error("The evidence or finding does not exist in this workspace.");
-      }
-
-      if (evidence.investigationId !== finding.investigationId) {
-        throw new Error("Evidence and finding must belong to the same investigation.");
-      }
-
-      if (evidence.redactionStatus !== "REDACTED" && evidence.redactionStatus !== "VERIFIED_SAFE") {
-        throw new Error("Only approved evidence can be linked to a finding.");
-      }
-
-      if (finding.status === "CLOSED") {
-        throw new Error("Evidence cannot be linked to a closed finding.");
-      }
-
-      const link = await tx.evidenceLink.create({
-        data: {
-          evidenceId: data.evidenceId,
-          findingId: data.findingId,
-          relationshipType: data.relationshipType,
-        },
-        select: evidenceLinkSelect,
-      });
-
-      await tx.auditLog.create({ data: auditRow(audit, link.id) });
-
-      return mapLink(link);
-    });
+    return this.db.$transaction(async (tx) =>
+      mapLink(await createEvidenceRelationship(tx, data, audit)),
+    );
   }
 
   async removeLink(
@@ -469,21 +647,7 @@ export class PrismaEvidenceStore implements EvidenceStore {
     linkId: string,
     audit: EvidenceAuditDraft,
   ): Promise<boolean> {
-    return this.db.$transaction(async (tx) => {
-      const link = await tx.evidenceLink.findFirst({
-        where: { id: linkId, evidence: { workspaceId } },
-        select: { id: true },
-      });
-
-      if (!link) {
-        return false;
-      }
-
-      await tx.evidenceLink.delete({ where: { id: linkId } });
-      await tx.auditLog.create({ data: auditRow(audit, linkId) });
-
-      return true;
-    });
+    return this.db.$transaction((tx) => removeEvidenceRelationship(tx, workspaceId, linkId, audit));
   }
 
   async recordAudit(event: AuditEvent): Promise<void> {

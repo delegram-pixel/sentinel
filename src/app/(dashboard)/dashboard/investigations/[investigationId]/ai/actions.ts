@@ -72,7 +72,10 @@ async function executeTask(
   taskType: AiTaskType,
   conversationId: string,
   fallbackTitle: string,
+  operationKey: string,
 ): Promise<{ conversationId: string }> {
+  if (operationKey.length < 8 || operationKey.length > 160)
+    throw new Error("Reload this form to obtain a valid analysis operation identifier.");
   const session = await getSessionContext();
   const deps = dependencies();
   const conversation = await resolveConversation(
@@ -91,6 +94,7 @@ async function executeTask(
       investigationId,
       conversationId: conversation.id,
       taskType,
+      operationKey,
     },
   );
 
@@ -147,6 +151,7 @@ export async function runReconAnalysisAction(
       "RECON_ANALYSIS",
       conversationId,
       "Reconnaissance analysis",
+      stringValue(formData, "operationKey"),
     );
   } catch (error) {
     return errorState(
@@ -178,6 +183,7 @@ export async function runHypothesisGenerationAction(
       "HYPOTHESIS_GENERATION",
       conversationId,
       "Hypothesis generation",
+      stringValue(formData, "operationKey"),
     );
   } catch (error) {
     return errorState(
@@ -195,6 +201,9 @@ export async function generateSessionSummaryAction(
   formData: FormData,
 ): Promise<AiFormState> {
   const investigationId = stringValue(formData, "investigationId");
+  const operationKey = stringValue(formData, "operationKey");
+  if (operationKey.length < 8 || operationKey.length > 160)
+    return errorState("Reload the form to obtain a valid operation identifier.");
 
   if (!investigationId) {
     return errorState("The investigation identifier is missing.");
@@ -205,7 +214,11 @@ export async function generateSessionSummaryAction(
   const result = await runAiTask(
     deps,
     { userId: session.user.id, workspaceId: session.workspace.id },
-    { investigationId, taskType: "SESSION_SUMMARY" },
+    {
+      investigationId,
+      taskType: "SESSION_SUMMARY",
+      operationKey: stringValue(formData, "operationKey"),
+    },
   );
 
   if (!result.ok) {

@@ -9,6 +9,7 @@ export const AI_TASK_TYPES = [
   "FINDING_SUMMARY",
   "REPORT_GENERATION",
   "SESSION_SUMMARY",
+  "PATTERN_ANALYSIS",
 ] as const;
 
 export type AiTaskType = (typeof AI_TASK_TYPES)[number];
@@ -22,6 +23,7 @@ export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
   FINDING_SUMMARY: "Finding summary",
   REPORT_GENERATION: "Report generation",
   SESSION_SUMMARY: "Session summary",
+  PATTERN_ANALYSIS: "Pattern analysis",
 };
 
 export type AiModelTier = "SONNET" | "HAIKU";
@@ -58,6 +60,14 @@ const INVESTIGATION_CAPABILITIES = [
 ] as const satisfies readonly Capability[];
 
 export const AI_TASK_PROFILES: Record<AiTaskType, AiTaskProfile> = {
+  PATTERN_ANALYSIS: {
+    tier: "SONNET",
+    inputTokenBudget: 40000,
+    outputTokenBudget: 4000,
+    promptId: "pattern.analysis",
+    requiredCapabilities: INVESTIGATION_CAPABILITIES,
+    supportsConversation: false,
+  },
   RECON_ANALYSIS: {
     tier: "SONNET",
     inputTokenBudget: 40_000,
@@ -86,7 +96,7 @@ export const AI_TASK_PROFILES: Record<AiTaskType, AiTaskProfile> = {
     tier: "SONNET",
     inputTokenBudget: 60_000,
     outputTokenBudget: 4_000,
-    promptId: null,
+    promptId: "evidence.analysis",
     requiredCapabilities: INVESTIGATION_CAPABILITIES,
     supportsConversation: false,
   },
@@ -94,7 +104,7 @@ export const AI_TASK_PROFILES: Record<AiTaskType, AiTaskProfile> = {
     tier: "SONNET",
     inputTokenBudget: 60_000,
     outputTokenBudget: 4_000,
-    promptId: null,
+    promptId: "verification.independent",
     requiredCapabilities: INVESTIGATION_CAPABILITIES,
     supportsConversation: false,
   },
@@ -102,7 +112,7 @@ export const AI_TASK_PROFILES: Record<AiTaskType, AiTaskProfile> = {
     tier: "HAIKU",
     inputTokenBudget: 30_000,
     outputTokenBudget: 2_000,
-    promptId: null,
+    promptId: "finding.summary",
     requiredCapabilities: INVESTIGATION_CAPABILITIES,
     supportsConversation: false,
   },
@@ -110,7 +120,7 @@ export const AI_TASK_PROFILES: Record<AiTaskType, AiTaskProfile> = {
     tier: "SONNET",
     inputTokenBudget: 60_000,
     outputTokenBudget: 4_000,
-    promptId: null,
+    promptId: "reporting.draft",
     requiredCapabilities: INVESTIGATION_CAPABILITIES,
     supportsConversation: false,
   },
@@ -142,6 +152,8 @@ export function assistantRoleForTask(taskType: AiTaskType): string {
   switch (taskType) {
     case "RECON_ANALYSIS":
       return "RECON_ASSISTANT";
+    case "PATTERN_ANALYSIS":
+      return "PATTERN_ANALYST";
     case "ATTACK_SURFACE_ANALYSIS":
     case "HYPOTHESIS_GENERATION":
       return "RESEARCH_ASSISTANT";

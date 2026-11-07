@@ -9,3 +9,12 @@ export type DomainResult<T> = { ok: true; value: T } | DomainFailure;
 export function failure(code: string, message: string): DomainFailure {
   return { ok: false, code, message };
 }
+
+export class ResearchOperationError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}

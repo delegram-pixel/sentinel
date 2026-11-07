@@ -88,14 +88,14 @@ export function FindingStatusForm({
       return false;
     }
 
-    if (status === "REPORTABLE" && !isReviewer) {
+    if ((status === "REPORTABLE" || status === "CLOSED") && !isReviewer) {
       return false;
     }
 
     return canTransitionFinding(
       currentStatus,
       status,
-      status === "REPORTABLE" ? "REVIEWER" : "RESEARCHER",
+      status === "REPORTABLE" || status === "CLOSED" ? "REVIEWER" : "RESEARCHER",
     );
   });
 
@@ -125,6 +125,18 @@ export function FindingStatusForm({
               ))}
             </Select>
           </Field>
+          {statuses.includes("CLOSED") ? (
+            <Field className="w-full">
+              <FieldLabel htmlFor="finding-closure-rationale">Closure rationale</FieldLabel>
+              <Textarea
+                id="finding-closure-rationale"
+                name="rationale"
+                required
+                maxLength={8000}
+                placeholder="Explain the human decision and its supporting review or retest."
+              />
+            </Field>
+          ) : null}
           <Button type="submit" variant="outline" disabled={pending}>
             {pending ? (
               <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden />

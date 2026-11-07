@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import type { AiTaskType } from "./ai-config";
+import {
+  agentClaimSchema,
+  evidenceAnalysisOutputSchema,
+  independentVerificationOutputSchema,
+  patternAnalysisOutputSchema,
+} from "./agent-output";
 
 const boundedText = (max: number) => z.string().trim().min(1).max(max);
 const textList = (maxItems: number, maxLength = 500) =>
@@ -9,6 +15,7 @@ const textList = (maxItems: number, maxLength = 500) =>
 const evidenceIds = z.array(z.string().uuid()).max(50);
 
 export const conversationOutputSchema = z.object({
+  referencedEvidenceIds: evidenceIds.default([]),
   message: boundedText(8_000),
   suggestedNextSteps: textList(8),
   referencedObservationIds: evidenceIds,
@@ -17,6 +24,11 @@ export const conversationOutputSchema = z.object({
 });
 
 export const reconAnalysisOutputSchema = z.object({
+  relevantHistoryIds: evidenceIds.default([]),
+  referencedKnowledgeIds: evidenceIds.default([]),
+  contextConfidence: z.enum(["low", "medium", "high"]).default("low"),
+  missingContext: textList(20).default([]),
+  referencedEvidenceIds: evidenceIds.default([]),
   summary: boundedText(4_000),
   knownInformation: textList(30),
   unknownInformation: textList(30),
@@ -27,7 +39,7 @@ export const reconAnalysisOutputSchema = z.object({
         description: boundedText(2_000),
         source: z.string().trim().max(200).optional(),
         confidence: z.enum(["low", "medium", "high"]),
-        requiresReview: z.boolean(),
+        requiresReview: z.literal(true),
       }),
     )
     .max(20),
@@ -48,6 +60,11 @@ export const hypothesisGenerationOutputSchema = z.object({
         missingInformation: boundedText(1_500),
         supportingObservationIds: evidenceIds,
         confidence: z.enum(["low", "medium", "high"]),
+        assumptions: textList(10).default([]),
+        expectedBehaviour: z.string().max(2000).default("Not established"),
+        observedBehaviour: z.string().max(2000).default("Not established"),
+        alternativeExplanations: textList(10).default([]),
+        evidenceRequirements: textList(10).default([]),
       }),
     )
     .max(12),
@@ -64,6 +81,7 @@ export const sessionSummaryOutputSchema = z.object({
 });
 
 export const verificationReviewOutputSchema = z.object({
+  referencedEvidenceIds: evidenceIds.default([]),
   conclusion: z.enum([
     "NEEDS_MORE_EVIDENCE",
     "NOT_REPRODUCIBLE",
@@ -87,19 +105,26 @@ export const findingSummaryOutputSchema = z.object({
   missingSections: textList(20),
 });
 
-export const reportGenerationOutputSchema = z.object({
-  title: boundedText(200),
-  summary: boundedText(4_000),
-  description: boundedText(8_000),
-  affectedAsset: boundedText(300),
-  preconditions: textList(20),
-  reproduction: textList(30),
-  expectedBehaviour: boundedText(2_000),
-  actualBehaviour: boundedText(2_000),
-  impact: boundedText(4_000),
-  remediation: boundedText(4_000),
-  evidenceReferences: textList(30),
-});
+export const reportGenerationOutputSchema = z
+  .object({
+    referencedFindingIds: z.array(z.uuid()).min(1).max(10),
+    referencedEvidenceIds: z.array(z.uuid()).max(50),
+    claims: z.array(agentClaimSchema).min(1).max(30),
+    assumptions: textList(20),
+    missingInformation: textList(20),
+    title: boundedText(200),
+    summary: boundedText(4_000),
+    description: boundedText(8_000),
+    affectedAsset: boundedText(300),
+    preconditions: textList(20),
+    reproduction: textList(30),
+    expectedBehaviour: boundedText(2_000),
+    actualBehaviour: boundedText(2_000),
+    impact: boundedText(4_000),
+    remediation: boundedText(4_000),
+    evidenceReferences: textList(30),
+  })
+  .strict();
 
 export type ConversationOutput = z.infer<typeof conversationOutputSchema>;
 export type ReconAnalysisOutput = z.infer<typeof reconAnalysisOutputSchema>;
@@ -147,6 +172,9 @@ export function outputKindForTask(taskType: AiTaskType): AiOutputKind | null {
 }
 
 export function outputSchemaForTask(taskType: AiTaskType): z.ZodType | null {
+  if (taskType === "PATTERN_ANALYSIS") return patternAnalysisOutputSchema;
+  if (taskType === "EVIDENCE_REVIEW") return evidenceAnalysisOutputSchema;
+  if (taskType === "FALSE_POSITIVE_REVIEW") return independentVerificationOutputSchema;
   const kind = outputKindForTask(taskType);
 
   return kind ? AI_OUTPUT_SCHEMAS[kind] : null;
@@ -160,6 +188,7 @@ export function invalidEvidenceReferences(
   output: unknown,
   knownObservationIds: ReadonlySet<string>,
   knownHypothesisIds: ReadonlySet<string>,
+  knownEvidenceIds: ReadonlySet<string> = new Set(),
 ): string[] {
   const problems: string[] = [];
   const record = output as Record<string, unknown>;
@@ -191,6 +220,12 @@ export function invalidEvidenceReferences(
         problems.push(`Unknown hypothesis reference: ${value}.`);
       }
     }
+  }
+
+  if (Array.isArray(record.referencedEvidenceIds)) {
+    for (const value of record.referencedEvidenceIds)
+      if (typeof value === "string" && !knownEvidenceIds.has(value))
+        problems.push(`Unknown evidence reference: ${value}.`);
   }
 
   return problems;

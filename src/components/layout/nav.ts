@@ -14,14 +14,20 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: "Workspace",
     items: [
       { label: "Dashboard", href: "/dashboard", exact: true },
+      { label: "Research insights", href: "/dashboard/insights" },
       { label: "Projects", href: "/dashboard/projects" },
       { label: "Investigations", href: "/dashboard/investigations" },
+      { label: "Engagements", href: "/dashboard/engagements" },
     ],
   },
   {
     label: "Research",
     items: [
       { label: "Targets", href: "/dashboard/targets" },
+      { label: "Knowledge", href: "/dashboard/knowledge" },
+      { label: "Tool imports", href: "/dashboard/imports" },
+      { label: "Remediation & outcomes", href: "/dashboard/remediation" },
+      { label: "Background work", href: "/dashboard/tasks" },
       { label: "Findings", href: "/dashboard/findings" },
       { label: "Evidence", href: "/dashboard/evidence" },
       { label: "Reports", href: "/dashboard/reports" },

@@ -47,7 +47,8 @@ describe("finding status transitions", () => {
     const resolvable = ["CONFIRMED", "REPORTABLE", "REJECTED", "FALSE_POSITIVE"] as const;
 
     for (const status of resolvable) {
-      expect(canTransitionFinding(status, "CLOSED", "RESEARCHER")).toBe(true);
+      expect(canTransitionFinding(status, "CLOSED", "RESEARCHER")).toBe(false);
+      expect(canTransitionFinding(status, "CLOSED", "REVIEWER")).toBe(true);
     }
   });
 

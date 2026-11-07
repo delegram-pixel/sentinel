@@ -3,6 +3,7 @@ import type { Capability } from "@/modules/security/domain/capability";
 
 import type { AiTaskType } from "../domain/ai-config";
 import type { AiTaskEventType, AiTaskStatus } from "../domain/ai-task-status";
+import type { AiProviderRequest, AiProviderResponse } from "./provider";
 
 export type AiProviderName = "ANTHROPIC";
 
@@ -37,6 +38,11 @@ export type AiConversationDetail = AiConversationRow & {
 };
 
 export type AiTaskRow = {
+  usageUncertain?: boolean;
+  usageReconciledAt?: Date | null;
+  reservedTokens?: number;
+  executionJobId?: string | null;
+  executorToken?: string | null;
   id: string;
   workspaceId: string;
   investigationId: string;
@@ -104,6 +110,9 @@ export type AiHypothesisContext = {
 };
 
 export type AiSummaryContext = {
+  sourceTaskId?: string | null;
+  sourceConversationId?: string | null;
+  createdBy?: string | null;
   id: string;
   summary: string;
   completedWork: string[];
@@ -149,6 +158,41 @@ export type AiScopeContext = {
 };
 
 export type AiContextRecord = {
+  engagement?: { id: string; name: string; objective: string | null; status: string } | null;
+  findings?: Array<{
+    id: string;
+    title: string;
+    status: string;
+    severity: string;
+    impact: string | null;
+    remediation: string | null;
+    reviews: Array<{
+      id: string;
+      reviewerType: string;
+      conclusion: string;
+      reasoningSummary: string | null;
+    }>;
+  }>;
+  decisions?: Array<{
+    id: string;
+    kind: string;
+    rationale: string;
+    sourceRefs: unknown;
+    createdAt: Date;
+  }>;
+  history?: Array<{
+    id: string;
+    title: string;
+    status: string;
+    objective: string | null;
+    sourceType?: string;
+    output?: unknown;
+    model?: string;
+    promptVersion?: string;
+    relations?: unknown;
+  }>;
+  knowledge?: import("@/modules/knowledge").RetrievedKnowledge[];
+  retrievalId?: string;
   investigation: {
     id: string;
     title: string;
@@ -198,6 +242,8 @@ export type AiConversationCreateData = {
 };
 
 export type AiMessageCreateData = {
+  operationKey?: string;
+  actor?: { workspaceId: string; userId: string };
   conversationId: string;
   role: "USER" | "ASSISTANT" | "SYSTEM" | "TOOL";
   content: string;
@@ -207,6 +253,9 @@ export type AiMessageCreateData = {
 };
 
 export type AiTaskCreateData = {
+  executionJobId?: string;
+  executorToken?: string;
+  requestHash?: string;
   workspaceId: string;
   investigationId: string;
   conversationId?: string;
@@ -228,6 +277,8 @@ export type AiTaskCreateData = {
 };
 
 export type AiTaskUpdateData = {
+  executionJobId?: string;
+  executorToken?: string;
   status?: AiTaskStatus;
   model?: string;
   promptTemplateId?: string;
@@ -258,10 +309,31 @@ export type AiSessionSummaryCreateData = {
 };
 
 export interface AiStore {
+  startAttempt(
+    workspaceId: string,
+    taskId: string,
+    sequence: number,
+    request: AiProviderRequest,
+    lease?: { jobId: string; token: string },
+  ): Promise<{ id: string }>;
+  finishAttempt(
+    workspaceId: string,
+    attemptId: string,
+    response: AiProviderResponse | null,
+    failureCode?: string,
+  ): Promise<void>;
+  resultMessage(workspaceId: string, taskId: string): Promise<AiMessageRow | null>;
+  completeTask(
+    workspaceId: string,
+    taskId: string,
+    data: AiTaskUpdateData,
+    result: { message?: AiMessageCreateData; summary?: AiSessionSummaryCreateData },
+  ): Promise<{ task: AiTaskRow; message: AiMessageRow | null } | null>;
   loadContext(
     workspaceId: string,
     investigationId: string,
     conversationId?: string,
+    requestedBy?: string,
   ): Promise<AiContextRecord | null>;
   listConversations(workspaceId: string, investigationId: string): Promise<AiConversationRow[]>;
   findConversation(

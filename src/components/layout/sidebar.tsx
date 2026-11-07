@@ -2,11 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 
 import { isNavItemActive, NAV_GROUPS } from "@/components/layout/nav";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <Suspense
+      fallback={
+        <aside className="h-full w-56 border-r border-border bg-surface p-6">
+          <Skeleton className="h-6 w-28" />
+          <Skeleton className="mt-12 h-64 w-full" />
+        </aside>
+      }
+    >
+      <SidebarContent onNavigate={onNavigate} />
+    </Suspense>
+  );
+}
+
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (

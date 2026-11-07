@@ -97,10 +97,16 @@ export const severityAssessmentSchema = z
 
 export type SeverityAssessmentInput = z.infer<typeof severityAssessmentSchema>;
 
-export const findingStatusChangeSchema = z.object({
-  status: z.enum(FINDING_STATUSES),
-  resolutionReason: resolutionReasonSchema.optional(),
-});
+export const findingStatusChangeSchema = z
+  .object({
+    rationale: z.string().trim().max(8000).optional(),
+    status: z.enum(FINDING_STATUSES),
+    resolutionReason: resolutionReasonSchema.optional(),
+  })
+  .refine(
+    (v) => v.status !== "CLOSED" || (v.rationale && v.rationale.length >= 10),
+    "Give a human rationale for closure.",
+  );
 
 export type FindingStatusChangeInput = z.infer<typeof findingStatusChangeSchema>;
 

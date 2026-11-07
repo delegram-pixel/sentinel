@@ -28,6 +28,7 @@ export type AiTokenUsage = {
 };
 
 export type AiProviderResponse = {
+  providerRequestId?: string;
   text: string;
   structured: unknown | null;
   usage: AiTokenUsage;

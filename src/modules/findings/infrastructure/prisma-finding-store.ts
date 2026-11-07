@@ -1,4 +1,9 @@
 import "server-only";
+import { guardFindingMutation } from "./finding-mutation-guard";
+import {
+  createEvidenceRelationship,
+  removeEvidenceRelationship,
+} from "@/modules/evidence/infrastructure/prisma-evidence-relationships";
 
 import { Prisma } from "@/generated/prisma/client";
 
@@ -324,6 +329,7 @@ export class PrismaFindingStore implements FindingStore {
     audit: Phase6AuditDraft,
   ): Promise<FindingRow | null> {
     return this.db.$transaction(async (tx) => {
+      if (!(await guardFindingMutation(tx, audit, findingId, data.expectedUpdatedAt))) return null;
       const existing = await tx.finding.findFirst({
         where: { id: findingId, workspaceId },
         select: { id: true, hypothesisId: true, investigationId: true },
@@ -373,6 +379,7 @@ export class PrismaFindingStore implements FindingStore {
     audit: Phase6AuditDraft,
   ): Promise<FindingRow | null> {
     return this.db.$transaction(async (tx) => {
+      if (!(await guardFindingMutation(tx, audit, findingId, data.expectedUpdatedAt))) return null;
       const existing = await tx.finding.findFirst({
         where: { id: findingId, workspaceId },
         select: { id: true, status: true },
@@ -408,6 +415,8 @@ export class PrismaFindingStore implements FindingStore {
     audit: Phase6AuditDraft,
   ): Promise<FindingRow | null> {
     return this.db.$transaction(async (tx) => {
+      if (!(await guardFindingMutation(tx, audit, findingId, data.expectedUpdatedAt, data.status)))
+        return null;
       const existing = await tx.finding.findFirst({
         where: { id: findingId, workspaceId },
         select: { id: true },
@@ -431,6 +440,22 @@ export class PrismaFindingStore implements FindingStore {
 
       await tx.auditLog.create({ data: auditRow(audit, finding.id) });
 
+      if (data.status === "CLOSED") {
+        if (!data.rationale || data.rationale.trim().length < 10)
+          throw new Error("A human closure rationale is required.");
+        await tx.researchDecision.create({
+          data: {
+            workspaceId,
+            investigationId: finding.investigationId,
+            findingId: finding.id,
+            kind: "CLOSE_FINDING",
+            rationale: data.rationale,
+            sourceRefs: [{ kind: "FINDING", id: finding.id, relationship: "CONTEXT" }],
+            createdBy: audit.userId,
+          },
+        });
+      }
+
       return mapFinding(finding);
     });
   }
@@ -447,6 +472,16 @@ export class PrismaFindingStore implements FindingStore {
     }
 
     return this.db.$transaction(async (tx) => {
+      if (
+        !(await guardFindingMutation(
+          tx,
+          audit,
+          data.findingId,
+          data.expectedUpdatedAt,
+          transition?.status,
+        ))
+      )
+        return null;
       const existing = await tx.finding.findFirst({
         where: { id: data.findingId, workspaceId: audit.workspaceId },
         select: { id: true },
@@ -458,6 +493,24 @@ export class PrismaFindingStore implements FindingStore {
 
       const review = await tx.verificationReview.create({
         data: {
+          basis: {
+            snapshotVersion: 1,
+            findingUpdatedAt: data.expectedUpdatedAt?.toISOString() ?? null,
+            availableApprovedLinkedEvidence: await tx.evidenceLink.findMany({
+              where: {
+                findingId: data.findingId,
+                evidence: {
+                  deletedAt: null,
+                  storageKey: { not: null },
+                  redactionStatus: { in: ["REDACTED", "VERIFIED_SAFE"] },
+                },
+              },
+              select: {
+                relationshipType: true,
+                evidence: { select: { id: true, version: true, checksum: true } },
+              },
+            }),
+          },
           findingId: data.findingId,
           taskId: data.taskId ?? null,
           reviewerType: data.reviewerType,
@@ -490,6 +543,22 @@ export class PrismaFindingStore implements FindingStore {
           });
 
       await tx.auditLog.create({ data: auditRow(audit, finding.id) });
+
+      if (data.reviewerType === "HUMAN")
+        await tx.researchDecision.create({
+          data: {
+            workspaceId: audit.workspaceId,
+            investigationId: finding.investigationId,
+            findingId: finding.id,
+            kind: data.conclusion === "NEEDS_MORE_EVIDENCE" ? "MORE_RESEARCH" : "RESEARCH_NOTE",
+            rationale:
+              data.reasoningSummary?.trim() ||
+              `Human verification conclusion: ${data.conclusion}. Historical review ${review.id}.`,
+            sourceRefs: [{ kind: "VERIFICATION_REVIEW", id: review.id, relationship: "CONTEXT" }],
+            legacySourceId: `human-review:${review.id}`,
+            createdBy: audit.userId,
+          },
+        });
 
       return { review: mapReview(review), finding: mapFinding(finding) };
     });
@@ -694,53 +763,9 @@ export class PrismaFindingStore implements FindingStore {
     data: FindingEvidenceLinkCreateData,
     audit: Phase6AuditDraft,
   ): Promise<FindingEvidenceLinkRow> {
-    return this.db.$transaction(async (tx) => {
-      const finding = await tx.finding.findFirst({
-        where: { id: data.findingId, workspaceId: data.workspaceId },
-        select: { id: true, investigationId: true, status: true },
-      });
-      const evidence = await tx.evidence.findFirst({
-        where: { id: data.evidenceId, workspaceId: data.workspaceId, deletedAt: null },
-        select: { id: true, investigationId: true, redactionStatus: true },
-      });
-
-      if (!finding || !evidence) {
-        throw new Error("The finding or evidence does not exist in this workspace.");
-      }
-
-      if (finding.status === "CLOSED") {
-        throw new Error("Evidence cannot be linked to a closed finding.");
-      }
-
-      if (evidence.investigationId !== finding.investigationId) {
-        throw new Error("Evidence and finding must belong to the same investigation.");
-      }
-
-      if (evidence.redactionStatus !== "REDACTED" && evidence.redactionStatus !== "VERIFIED_SAFE") {
-        throw new Error("Only approved evidence can be linked to a finding.");
-      }
-
-      const link = await tx.evidenceLink.create({
-        data: {
-          evidenceId: data.evidenceId,
-          findingId: data.findingId,
-          relationshipType: data.relationshipType,
-        },
-        select: {
-          id: true,
-          evidenceId: true,
-          relationshipType: true,
-          createdAt: true,
-          evidence: {
-            select: { title: true, evidenceType: true, redactionStatus: true },
-          },
-        },
-      });
-
-      await tx.auditLog.create({ data: auditRow(audit, link.id) });
-
-      return mapEvidenceLink(link);
-    });
+    return this.db.$transaction(async (tx) =>
+      mapEvidenceLink(await createEvidenceRelationship(tx, data, audit)),
+    );
   }
 
   async removeEvidenceLink(
@@ -748,21 +773,7 @@ export class PrismaFindingStore implements FindingStore {
     linkId: string,
     audit: Phase6AuditDraft,
   ): Promise<boolean> {
-    return this.db.$transaction(async (tx) => {
-      const link = await tx.evidenceLink.findFirst({
-        where: { id: linkId, finding: { workspaceId } },
-        select: { id: true },
-      });
-
-      if (!link) {
-        return false;
-      }
-
-      await tx.evidenceLink.delete({ where: { id: linkId } });
-      await tx.auditLog.create({ data: auditRow(audit, linkId) });
-
-      return true;
-    });
+    return this.db.$transaction((tx) => removeEvidenceRelationship(tx, workspaceId, linkId, audit));
   }
 
   async recordAudit(event: AuditEvent): Promise<void> {

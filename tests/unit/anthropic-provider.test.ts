@@ -126,8 +126,35 @@ describe("Anthropic provider", () => {
 
     const provider = new AnthropicProvider({ apiKey: "test-key", fetchImpl });
 
-    await expect(provider.generate(request())).rejects.toMatchObject({
-      code: "AI_REFUSAL",
+    await expect(provider.generate(request())).resolves.toMatchObject({
+      stopReason: "refusal",
+      usage: { inputTokens: 10, outputTokens: 0 },
     });
+  });
+  it("rejects unknown tool names, multiple results and malformed token usage", async () => {
+    for (const payload of [
+      {
+        content: [{ type: "tool_use", name: "execute_command", input: {} }],
+        usage: { input_tokens: 10, output_tokens: 2 },
+      },
+      {
+        content: [
+          { type: "tool_use", name: "return_structured_output", input: {} },
+          { type: "tool_use", name: "return_structured_output", input: {} },
+        ],
+        usage: { input_tokens: 10, output_tokens: 2 },
+      },
+      { content: [], usage: { input_tokens: -1, output_tokens: 2 } },
+      { content: [], usage: {} },
+    ]) {
+      const provider = new AnthropicProvider({
+        apiKey: "test-key",
+        fetchImpl: async () =>
+          new Response(JSON.stringify({ ...payload, stop_reason: "tool_use" })),
+      });
+      await expect(provider.generate(request())).rejects.toMatchObject({
+        code: "AI_INVALID_OUTPUT",
+      });
+    }
   });
 });

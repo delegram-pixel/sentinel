@@ -59,7 +59,7 @@ function assertReportContextEditable(context: ReportInvestigationContext): Domai
   return { ok: true, value: true };
 }
 
-function buildSnapshots(findings: ReportFindingInput[]): {
+export function buildSnapshots(findings: ReportFindingInput[]): {
   evidenceSnapshot: ReportEvidenceSnapshot[];
   findingSnapshot: ReportFindingSnapshot[];
 } {
@@ -68,6 +68,7 @@ function buildSnapshots(findings: ReportFindingInput[]): {
 
   for (const finding of findings) {
     findingSnapshot.push({
+      sourceUpdatedAt: finding.sourceUpdatedAt,
       findingId: finding.id,
       title: finding.title,
       status: finding.status,
@@ -77,7 +78,8 @@ function buildSnapshots(findings: ReportFindingInput[]): {
     });
 
     for (const item of finding.evidence) {
-      evidence.set(item.evidenceId, {
+      evidence.set(`${finding.id}:${item.evidenceId}:${item.relationshipType}`, {
+        findingId: finding.id,
         evidenceId: item.evidenceId,
         title: item.title,
         evidenceType: item.evidenceType,
@@ -229,7 +231,6 @@ export async function createReportTemplate(
     auditDraft(actor, "REPORT_TEMPLATE_CREATED", {
       newValue: {
         name: parsed.data.name,
-        version: 0,
         sections: sections.map((section) => section.id),
       },
     }),
@@ -427,6 +428,8 @@ export async function saveReportRevision(
     actor.workspaceId,
     reportId,
     {
+      expectedRevision: report.latestRevisionVersion,
+      expectedStatus: report.status,
       content: parsed.data.content,
       evidenceSnapshot: snapshots.evidenceSnapshot,
       findingSnapshot: snapshots.findingSnapshot,
@@ -493,7 +496,11 @@ export async function submitReport(
   const updated = await store.transitionReport(
     actor.workspaceId,
     reportId,
-    { status: "UNDER_REVIEW" },
+    {
+      expectedRevision: report.latestRevisionVersion,
+      expectedStatus: report.status,
+      status: "UNDER_REVIEW",
+    },
     auditDraft(actor, "REPORT_STATUS_CHANGED", {
       previousValue: { status: report.status },
       newValue: { status: "UNDER_REVIEW" },
@@ -551,7 +558,13 @@ export async function approveReport(
   const updated = await store.transitionReport(
     actor.workspaceId,
     reportId,
-    { status: "APPROVED", approvedBy: actor.userId, approvedAt: now },
+    {
+      expectedRevision: report.latestRevisionVersion,
+      expectedStatus: report.status,
+      status: "APPROVED",
+      approvedBy: actor.userId,
+      approvedAt: now,
+    },
     auditDraft(actor, "REPORT_STATUS_CHANGED", {
       previousValue: { status: report.status },
       newValue: { status: "APPROVED", approvedBy: actor.userId, approvedAt: now.toISOString() },
@@ -583,7 +596,11 @@ export async function reopenReport(
   const updated = await store.transitionReport(
     actor.workspaceId,
     reportId,
-    { status: "DRAFT" },
+    {
+      expectedRevision: report.latestRevisionVersion,
+      expectedStatus: report.status,
+      status: "DRAFT",
+    },
     auditDraft(actor, "REPORT_STATUS_CHANGED", {
       previousValue: { status: report.status },
       newValue: { status: "DRAFT" },
@@ -616,7 +633,12 @@ export async function archiveReport(
   const updated = await store.transitionReport(
     actor.workspaceId,
     reportId,
-    { status: "ARCHIVED", archivedAt: now },
+    {
+      expectedRevision: report.latestRevisionVersion,
+      expectedStatus: report.status,
+      status: "ARCHIVED",
+      archivedAt: now,
+    },
     auditDraft(actor, "REPORT_STATUS_CHANGED", {
       previousValue: { status: report.status },
       newValue: { status: "ARCHIVED", archivedAt: now.toISOString() },
@@ -687,7 +709,11 @@ export async function exportReport(
     const updated = await store.transitionReport(
       actor.workspaceId,
       reportId,
-      { status: "EXPORTED" },
+      {
+        expectedRevision: report.latestRevisionVersion,
+        expectedStatus: report.status,
+        status: "EXPORTED",
+      },
       auditDraft(actor, "REPORT_EXPORTED", {
         previousValue: { status: report.status },
         newValue: {
@@ -719,7 +745,7 @@ export async function readReportExport(
 ): Promise<ReportExport | null> {
   const report = await store.findReport(workspaceId, reportId);
 
-  if (!report || (report.status !== "APPROVED" && report.status !== "EXPORTED")) {
+  if (!report || report.status !== "EXPORTED") {
     return null;
   }
 

@@ -42,6 +42,20 @@ test("Settings does not expose workspace details to a guest", async ({ page }) =
   await expectGuestBoundary(page);
 });
 
+for (const path of [
+  "/dashboard/engagements",
+  "/dashboard/knowledge",
+  "/dashboard/imports",
+  "/dashboard/remediation",
+  "/dashboard/tasks",
+  "/dashboard/insights",
+]) {
+  test(`${path} enforces the workspace authentication boundary`, async ({ page }) => {
+    await page.goto(path);
+    await expectGuestBoundary(page);
+  });
+}
+
 for (const route of [
   { path: "/sign-in", title: /sign in/i },
   { path: "/sign-up", title: /create your account|sign up/i },

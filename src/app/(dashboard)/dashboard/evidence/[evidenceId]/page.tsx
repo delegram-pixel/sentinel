@@ -3,6 +3,17 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { EvidenceDetailView } from "@/components/research/evidence-detail";
+import { ResearchActionForm } from "@/components/research/research-action-form";
+import { ResearchSection } from "@/components/shared/research-section";
+import { AgentResearchOutput } from "@/components/ai/agent-research-output";
+import { PrismaResearchStore } from "@/modules/research/infrastructure/prisma-research-store";
+import { PrismaResearchEvidenceStore } from "@/modules/evidence/infrastructure/prisma-research-evidence-store";
+import {
+  recordProvenanceAction,
+  relateEvidenceResearchAction,
+  reviewAssessmentAction,
+  reviewReplacementAction,
+} from "../research-actions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getDb } from "@/lib/db";
 import { getSessionContext } from "@/lib/session";
@@ -47,20 +58,171 @@ async function EvidenceDetailContent({ params }: EvidenceDetailPageProps) {
     session.workspace.id,
     evidence.investigationId,
   );
+  const [investigation, assessments, approvedVersions] = await Promise.all([
+    new PrismaResearchStore(getDb()).findInvestigation(
+      session.workspace.id,
+      evidence.investigationId,
+    ),
+    new PrismaResearchEvidenceStore(getDb()).listAssessments(session.workspace.id, evidence.id),
+    new PrismaEvidenceStore(getDb()).listApprovedEvidence(
+      session.workspace.id,
+      evidence.investigationId,
+    ),
+  ]);
 
   return (
-    <EvidenceDetailView
-      evidence={evidence}
-      findings={findings
-        .filter((finding) => finding.status !== "CLOSED")
-        .map((finding) => ({
-          id: finding.id,
-          title: finding.title,
-          status: finding.status,
-        }))}
-      isReviewer={
-        session.role === "OWNER" || session.role === "ADMIN" || session.role === "REVIEWER"
-      }
-    />
+    <div className="page-stack">
+      <EvidenceDetailView
+        evidence={evidence}
+        findings={findings
+          .filter((finding) => finding.status !== "CLOSED")
+          .map((finding) => ({
+            id: finding.id,
+            title: finding.title,
+            status: finding.status,
+          }))}
+        isReviewer={
+          session.role === "OWNER" || session.role === "ADMIN" || session.role === "REVIEWER"
+        }
+      />
+      <ResearchSection id="collection-provenance" title="Collection provenance">
+        <p className="mb-4 text-sm">
+          Collector: {evidence.collector ?? "Unknown"} · Collection date:{" "}
+          {evidence.collectedAt?.toLocaleDateString() ?? "Unknown"}
+        </p>
+        {!evidence.collector && !evidence.deletedAt ? (
+          <ResearchActionForm
+            action={recordProvenanceAction}
+            hidden={{ evidenceId: evidence.id }}
+            submitLabel="Record collection provenance"
+            fields={[
+              { name: "collector", label: "Collector", required: true, maxLength: 300 },
+              { name: "collectedAt", label: "Collection date, if known", type: "date" },
+              {
+                name: "source",
+                label: "Collection source and method",
+                type: "textarea",
+                required: true,
+                maxLength: 2000,
+              },
+            ]}
+          />
+        ) : null}
+      </ResearchSection>
+      {["OWNER", "ADMIN", "REVIEWER"].includes(session.role) &&
+      evidence.storageKey &&
+      !evidence.deletedAt &&
+      !evidence.supersedesId ? (
+        <ResearchSection id="review-replacement" title="Reviewed replacement">
+          <ResearchActionForm
+            action={reviewReplacementAction}
+            hidden={{ evidenceId: evidence.id }}
+            submitLabel="Record reviewed replacement"
+            fields={[
+              {
+                name: "supersedesId",
+                label: "Previous approved evidence version",
+                required: true,
+                options: approvedVersions
+                  .filter((e) => e.id !== evidence.id)
+                  .map((e) => ({ value: e.id, label: `${e.title} · v${e.version}` })),
+              },
+              {
+                name: "rationale",
+                label: "Replacement rationale",
+                type: "textarea",
+                required: true,
+                maxLength: 8000,
+              },
+            ]}
+          />
+          <p className="text-sm text-muted-foreground">
+            Review a fresh upload before linking it to research. Finish its background promotion
+            first; the previous evidence and its existing references are retained.
+          </p>
+        </ResearchSection>
+      ) : null}
+      {investigation && !evidence.deletedAt ? (
+        <ResearchSection id="evidence-research-relations" title="Research relationships">
+          <ResearchActionForm
+            action={relateEvidenceResearchAction}
+            hidden={{ evidenceId: evidence.id }}
+            submitLabel="Link research record"
+            fields={[
+              {
+                name: "subject",
+                label: "Observation or hypothesis",
+                required: true,
+                options: [
+                  ...investigation.observations.map((o) => ({
+                    value: `OBSERVATION:${o.id}`,
+                    label: o.title,
+                  })),
+                  ...investigation.hypotheses.map((h) => ({
+                    value: `HYPOTHESIS:${h.id}`,
+                    label: h.title,
+                  })),
+                ],
+              },
+              {
+                name: "relationship",
+                label: "Relationship",
+                options: ["SUPPORTS", "CONTRADICTS", "CONTEXT"].map((r) => ({
+                  value: r,
+                  label: r,
+                })),
+              },
+              {
+                name: "rationale",
+                label: "Relationship rationale",
+                type: "textarea",
+                required: true,
+                maxLength: 2000,
+              },
+            ]}
+          />
+        </ResearchSection>
+      ) : null}
+      <ResearchSection id="evidence-assessments" title="Evidence quality assessments">
+        {assessments.length ? (
+          assessments.map((a) => (
+            <div className="border-b border-border py-4" key={a.id}>
+              <p className="mb-3 text-sm">
+                {a.assessorType} assessment · {a.reviewStatus}
+              </p>
+              <AgentResearchOutput
+                output={{ assessments: [a.assessment], claims: [], uncertaintyNotes: [] }}
+              />
+              {["OWNER", "ADMIN", "REVIEWER"].includes(session.role) ? (
+                <ResearchActionForm
+                  action={reviewAssessmentAction}
+                  hidden={{ assessmentId: a.id }}
+                  submitLabel="Record assessment review"
+                  fields={[
+                    {
+                      name: "status",
+                      label: "Review",
+                      options: [
+                        { value: "REVIEWED", label: "Reviewed" },
+                        { value: "WITHDRAWN", label: "Withdrawn" },
+                      ],
+                    },
+                    {
+                      name: "rationale",
+                      label: "Review rationale",
+                      type: "textarea",
+                      required: true,
+                      maxLength: 2000,
+                    },
+                  ]}
+                />
+              ) : null}
+            </div>
+          ))
+        ) : (
+          <p>No evidence quality assessments recorded.</p>
+        )}
+      </ResearchSection>
+    </div>
   );
 }

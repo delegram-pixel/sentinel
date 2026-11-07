@@ -54,8 +54,7 @@ export function ReportCreateForm({
     state.status === "error" ? state.values.title : `${investigationTitle} report`;
   const selectedIds =
     state.status === "error" ? state.values.findingIds : initialFindingId ? [initialFindingId] : [];
-  const selectedTemplateId =
-    state.status === "error" ? state.values.templateId : (templates[0]?.id ?? "");
+  const selectedTemplateId = state.status === "error" ? state.values.templateId : "";
 
   return (
     <form ref={formRef} action={formAction} aria-busy={pending} className="form-stack">

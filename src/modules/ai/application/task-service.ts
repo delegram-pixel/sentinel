@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { invalidAgentSources } from "../domain/agent-output";
+import { createHash, randomUUID } from "node:crypto";
 
 import { z } from "zod";
 
@@ -13,12 +14,7 @@ import {
   type AiModelOverrides,
   type AiTaskType,
 } from "../domain/ai-config";
-import {
-  canAffordTask,
-  estimateCostUsd,
-  estimateTokens,
-  AI_DAILY_USER_TOKEN_CAP,
-} from "../domain/ai-budgets";
+import { estimateCostUsd, estimateTokens } from "../domain/ai-budgets";
 import { aiErrorFromUnknown } from "../domain/ai-errors";
 import {
   invalidEvidenceReferences,
@@ -191,10 +187,18 @@ function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
 
 type ValidationOutcome = { ok: true; output: unknown } | { ok: false; problems: string[] };
 
-function validateOutput(
+export function validateOutput(
   taskType: AiTaskType,
   structured: unknown,
-  context: { observationIds: ReadonlySet<string>; hypothesisIds: ReadonlySet<string> },
+  context: {
+    observationIds: ReadonlySet<string>;
+    hypothesisIds: ReadonlySet<string>;
+    evidenceIds: ReadonlySet<string>;
+    findingIds?: ReadonlySet<string>;
+    decisionIds?: ReadonlySet<string>;
+    knowledgeIds?: ReadonlySet<string>;
+    historyIds?: ReadonlySet<string>;
+  },
 ): ValidationOutcome {
   const schema = outputSchemaForTask(taskType);
 
@@ -221,14 +225,39 @@ function validateOutput(
     parsed.data,
     context.observationIds,
     context.hypothesisIds,
+    context.evidenceIds,
   );
 
+  references.push(
+    ...invalidAgentSources(parsed.data, {
+      OBSERVATION: context.observationIds,
+      HYPOTHESIS: context.hypothesisIds,
+      EVIDENCE: context.evidenceIds,
+      FINDING: context.findingIds,
+      DECISION: context.decisionIds,
+      KNOWLEDGE: context.knowledgeIds,
+      HISTORY: context.historyIds,
+    }),
+  );
+  const record = parsed.data as Record<string, unknown>;
+  if (Array.isArray(record.referencedFindingIds))
+    for (const id of record.referencedFindingIds)
+      if (typeof id === "string" && !context.findingIds?.has(id))
+        references.push(`Unknown finding reference: ${id}.`);
+  for (const [field, set] of [
+    ["relevantHistoryIds", context.historyIds],
+    ["referencedKnowledgeIds", context.knowledgeIds],
+  ] as const)
+    if (Array.isArray(record[field]))
+      for (const id of record[field])
+        if (typeof id === "string" && !set?.has(id))
+          references.push(`Unknown selected source: ${id}.`);
   return references.length > 0
     ? { ok: false, problems: references }
     : { ok: true, output: parsed.data };
 }
 
-function formatAssistantMessage(taskType: AiTaskType, output: unknown): string {
+export function formatAssistantMessage(taskType: AiTaskType, output: unknown): string {
   switch (taskType) {
     case "RECON_ANALYSIS": {
       const value = output as {
@@ -308,11 +337,13 @@ async function failTask(
 }
 
 export type AiTaskInput = {
+  executionLease?: { jobId: string; token: string };
   investigationId: string;
   conversationId?: string;
   taskType: AiTaskType;
   instruction?: string;
   parentTaskId?: string;
+  operationKey?: string;
 };
 
 export type AiTaskResult = {
@@ -346,6 +377,7 @@ export async function runAiTask(
     actor.workspaceId,
     input.investigationId,
     input.conversationId,
+    actor.userId,
   );
 
   if (!context) {
@@ -362,30 +394,83 @@ export async function runAiTask(
     );
   }
 
+  if (
+    ["FINDING_SUMMARY", "REPORT_GENERATION"].includes(input.taskType) &&
+    !(context.findings ?? []).some((f) => ["CONFIRMED", "REPORTABLE"].includes(f.status))
+  )
+    return failure("AI_PERMISSION_DENIED", "Reporting analysis requires a human-approved finding.");
+  if (["FINDING_SUMMARY", "REPORT_GENERATION"].includes(input.taskType))
+    context = {
+      ...context,
+      findings: context.findings?.filter((f) => ["CONFIRMED", "REPORTABLE"].includes(f.status)),
+    };
+  if (
+    ["EVIDENCE_REVIEW", "FALSE_POSITIVE_REVIEW"].includes(input.taskType) &&
+    !context.evidence.length
+  )
+    return failure(
+      "AI_CONTEXT_UNAVAILABLE",
+      "Link approved evidence before requesting evidence or verification analysis.",
+    );
+
   context = await hydrateEvidenceContent(context, deps.evidenceStorage);
 
   const model = modelForTask(input.taskType, deps.modelOverrides);
   const now = nowOf(deps);
-  const idempotencyKey = deps.idempotencyKey?.() ?? randomUUID();
+  const idempotencyKey = input.operationKey ?? deps.idempotencyKey?.() ?? randomUUID();
 
-  const task = await deps.store.createTask({
-    workspaceId: actor.workspaceId,
-    investigationId: input.investigationId,
-    conversationId: input.conversationId,
-    taskType: input.taskType,
-    assignedRole: assistantRoleForTask(input.taskType),
-    provider: PROVIDER_NAME,
-    model,
-    promptTemplateId: prompt.id,
-    promptVersion: prompt.version,
-    contextVersion: "unassembled",
-    idempotencyKey,
-    requiredCapabilities: [...profile.requiredCapabilities],
-    inputTokenBudget: profile.inputTokenBudget,
-    outputTokenBudget: profile.outputTokenBudget,
-    requestedBy: actor.userId,
-    parentTaskId: input.parentTaskId,
-  });
+  let task: AiTaskRow;
+  try {
+    task = await deps.store.createTask({
+      workspaceId: actor.workspaceId,
+      investigationId: input.investigationId,
+      executionJobId: input.executionLease?.jobId,
+      executorToken: input.executionLease?.token,
+      conversationId: input.conversationId,
+      taskType: input.taskType,
+      assignedRole: assistantRoleForTask(input.taskType),
+      provider: PROVIDER_NAME,
+      model,
+      promptTemplateId: prompt.id,
+      promptVersion: prompt.version,
+      contextVersion: "unassembled",
+      idempotencyKey,
+      requiredCapabilities: [...profile.requiredCapabilities],
+      inputTokenBudget: profile.inputTokenBudget,
+      outputTokenBudget: profile.outputTokenBudget,
+      requestedBy: actor.userId,
+      parentTaskId: input.parentTaskId,
+      requestHash: createHash("sha256")
+        .update(
+          JSON.stringify({
+            investigationId: input.investigationId,
+            conversationId: input.conversationId ?? null,
+            taskType: input.taskType,
+            instruction: input.instruction ?? null,
+          }),
+        )
+        .digest("hex"),
+    });
+  } catch (error) {
+    const aiError = aiErrorFromUnknown(error);
+    return failure(aiError.code, aiError.message);
+  }
+  if (task.failureCode === "AI_BUDGET_EXCEEDED")
+    return failure("AI_BUDGET_EXCEEDED", "The daily AI budget is exhausted.");
+  if (task.status === "COMPLETED")
+    return {
+      ok: true,
+      value: {
+        task,
+        output: task.output,
+        message: await deps.store.resultMessage(actor.workspaceId, task.id),
+      },
+    };
+  if (task.status !== "PENDING")
+    return failure(
+      "AI_TASK_ALREADY_ADMITTED",
+      "This request is already running or has finished. Check task history.",
+    );
 
   await deps.store.recordTaskEvent(task.id, "TASK_CREATED", "AI task created.", {
     taskType: input.taskType,
@@ -394,20 +479,6 @@ export async function runAiTask(
     promptVersion: prompt.version,
     promptHash: prompt.contentHash,
   });
-
-  const usedTokens = await deps.store.sumUserUsageSince(
-    actor.userId,
-    new Date(now.getTime() - 24 * 60 * 60 * 1000),
-  );
-
-  if (!canAffordTask(usedTokens, profile)) {
-    return failTask(
-      deps,
-      task,
-      "AI_BUDGET_EXCEEDED",
-      `The daily ${AI_DAILY_USER_TOKEN_CAP.toLocaleString()}-token cap would be exceeded.`,
-    );
-  }
 
   const targetDocumented = Boolean(context.target.assetIdentifier);
   const activeScope = context.activeScope !== null;
@@ -434,7 +505,10 @@ export async function runAiTask(
   let assembled: ReturnType<typeof assembleContext>;
 
   try {
-    assembled = assembleContext(context, profile.inputTokenBudget);
+    assembled = assembleContext(
+      context,
+      Math.max(1, profile.inputTokenBudget - 2500 - estimateTokens(input.instruction ?? "")),
+    );
   } catch (error) {
     const aiError = aiErrorFromUnknown(error);
     return failTask(deps, task, aiError.code, aiError.message);
@@ -453,38 +527,10 @@ export async function runAiTask(
     },
   );
 
-  const running = await deps.store.updateTask(actor.workspaceId, task.id, {
-    status: "RUNNING",
-    contextVersion: assembled.contextVersion,
-    startedAt: now,
-    inputContext: {
-      promptId: prompt.id,
-      promptVersion: prompt.version,
-      promptHash: prompt.contentHash,
-      contextVersion: assembled.contextVersion,
-      compressed: assembled.compressed,
-      included: assembled.included,
-      evidence: assembled.evidence,
-      estimatedInputTokens: assembled.estimatedInputTokens,
-      conversationId: input.conversationId ?? null,
-    },
-  });
-
-  if (!running) {
-    return failure("AI_TASK_NOT_FOUND", "The AI task disappeared before it could run.");
-  }
-
-  await deps.store.recordTaskEvent(
-    task.id,
-    "TASK_ASSIGNMENT",
-    `Assigned ${input.taskType} to ${model}.`,
-  );
-  await deps.store.recordTaskEvent(task.id, "AI_PROCESSING", "Provider request started.");
-
   const schema = outputSchemaForTask(input.taskType);
 
   if (!schema) {
-    return failTask(deps, running, "AI_TASK_NOT_SUPPORTED", "No output schema is registered.");
+    return failTask(deps, task, "AI_TASK_NOT_SUPPORTED", "No output schema is registered.");
   }
 
   const instruction = input.instruction ?? promptInstruction(input.taskType);
@@ -505,11 +551,74 @@ export async function runAiTask(
     },
   };
 
+  const estimatedRequestTokens =
+    estimateTokens(system) +
+    messages.reduce((sum, m) => sum + estimateTokens(m.content) + 8, 0) +
+    estimateTokens(JSON.stringify(request.structuredOutput));
+  if (estimatedRequestTokens > profile.inputTokenBudget)
+    return failTask(
+      deps,
+      task,
+      "AI_CONTEXT_TOO_LARGE",
+      "The complete model request exceeds its input budget.",
+    );
+  const running = await deps.store.updateTask(actor.workspaceId, task.id, {
+    status: "RUNNING",
+    executionJobId: input.executionLease?.jobId,
+    executorToken: input.executionLease?.token,
+    contextVersion: assembled.contextVersion,
+    startedAt: now,
+    inputContext: {
+      snapshotVersion: 1,
+      promptId: prompt.id,
+      promptVersion: prompt.version,
+      promptHash: prompt.contentHash,
+      contextVersion: assembled.contextVersion,
+      compressed: assembled.compressed,
+      included: assembled.included,
+      evidence: assembled.evidence,
+      sourceManifest: assembled.sourceManifest,
+      estimatedInputTokens: estimatedRequestTokens,
+      conversationId: input.conversationId ?? null,
+      request,
+    },
+  });
+  if (!running) return failure("AI_TASK_ALREADY_ADMITTED", "This task is already being processed.");
+  await deps.store.recordTaskEvent(
+    task.id,
+    "TASK_ASSIGNMENT",
+    `Assigned ${input.taskType} to ${model}.`,
+  );
+  async function callProvider(providerRequest: typeof request, sequence: number) {
+    await deps.store.recordTaskEvent(task.id, "AI_PROCESSING", "Provider request started.", {
+      sequence,
+    });
+    const attempt = await deps.store.startAttempt(
+      actor.workspaceId,
+      task.id,
+      sequence,
+      providerRequest,
+      input.executionLease,
+    );
+    try {
+      const response = await deps.provider.generate(providerRequest);
+      await deps.store.finishAttempt(actor.workspaceId, attempt.id, response);
+      return response;
+    } catch (error) {
+      await deps.store.finishAttempt(
+        actor.workspaceId,
+        attempt.id,
+        null,
+        aiErrorFromUnknown(error).code,
+      );
+      throw error;
+    }
+  }
   let response: AiProviderResponse;
   let usage = { inputTokens: 0, outputTokens: 0 };
 
   try {
-    response = await deps.provider.generate(request);
+    response = await callProvider(request, 1);
     usage = {
       inputTokens: usage.inputTokens + response.usage.inputTokens,
       outputTokens: usage.outputTokens + response.usage.outputTokens,
@@ -519,9 +628,17 @@ export async function runAiTask(
     return failTask(deps, running, aiError.code, aiError.message, usage);
   }
 
+  if (response.stopReason === "refusal")
+    return failTask(deps, running, "AI_REFUSAL", "The provider declined this request.", usage);
+
   const knowledge = {
-    observationIds: new Set(context.observations.map((observation) => observation.id)),
-    hypothesisIds: new Set(context.hypotheses.map((hypothesis) => hypothesis.id)),
+    observationIds: new Set(assembled.sourceManifest.observationIds),
+    hypothesisIds: new Set(assembled.sourceManifest.hypothesisIds),
+    evidenceIds: new Set(assembled.sourceManifest.evidenceIds),
+    findingIds: new Set(assembled.sourceManifest.findingIds),
+    decisionIds: new Set(assembled.sourceManifest.decisionIds),
+    knowledgeIds: new Set(assembled.sourceManifest.knowledgeIds),
+    historyIds: new Set(assembled.sourceManifest.historyIds),
   };
 
   let validation = validateOutput(input.taskType, response.structured, knowledge);
@@ -555,12 +672,32 @@ export async function runAiTask(
     ];
 
     try {
-      const retry = await deps.provider.generate({ ...request, messages: correction });
+      const correctionTokens =
+        estimateTokens(system) +
+        correction.reduce((sum, m) => sum + estimateTokens(m.content) + 8, 0) +
+        estimateTokens(JSON.stringify(request.structuredOutput));
+      if (correctionTokens > profile.inputTokenBudget)
+        return failTask(
+          deps,
+          running,
+          "AI_CONTEXT_TOO_LARGE",
+          "The correction request exceeds the input budget.",
+          usage,
+        );
+      const retry = await callProvider({ ...request, messages: correction }, 2);
       finalResponse = retry;
       usage = {
         inputTokens: usage.inputTokens + retry.usage.inputTokens,
         outputTokens: usage.outputTokens + retry.usage.outputTokens,
       };
+      if (retry.stopReason === "refusal")
+        return failTask(
+          deps,
+          running,
+          "AI_REFUSAL",
+          "The provider declined the correction request.",
+          usage,
+        );
       validation = validateOutput(input.taskType, retry.structured, knowledge);
     } catch (error) {
       const aiError = aiErrorFromUnknown(error);
@@ -585,80 +722,64 @@ export async function runAiTask(
 
   const estimatedCostUsd = estimateCostUsd(profile.tier, usage.inputTokens, usage.outputTokens);
 
-  let assistantMessage: AiMessageRow | null = null;
-
   try {
-    if (input.taskType === "SESSION_SUMMARY") {
-      const summary = validation.output as SessionSummaryOutput;
-
-      await deps.store.createAiSessionSummary(
-        {
-          investigationId: input.investigationId,
-          summary: summary.summary,
-          completedWork: summary.completedWork,
-          rejectedHypotheses: summary.rejectedHypotheses,
-          unresolvedQuestions: summary.unresolvedQuestions,
-          nextActions: summary.nextActions,
-          model,
-          promptVersion: prompt.version,
-          sourceTaskId: task.id,
-          createdBy: actor.userId,
-        },
-        {
-          workspaceId: actor.workspaceId,
-          userId: actor.userId,
-          action: "SESSION_SUMMARY_CREATED",
-          entityType: "SessionSummary",
-          newValue: {
-            investigationId: input.investigationId,
-            generatedByType: "AI",
-          },
-        },
-      );
-    }
-
-    if (input.conversationId && input.taskType !== "SESSION_SUMMARY") {
-      assistantMessage = await deps.store.appendMessage({
-        conversationId: input.conversationId,
-        role: "ASSISTANT",
-        content: formatAssistantMessage(input.taskType, validation.output),
-        structuredContent: validation.output,
+    const summary =
+      input.taskType === "SESSION_SUMMARY" ? (validation.output as SessionSummaryOutput) : null;
+    const completed = await deps.store.completeTask(
+      actor.workspaceId,
+      task.id,
+      {
+        executionJobId: input.executionLease?.jobId,
+        executorToken: input.executionLease?.token,
+        output: validation.output,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
-      });
-    }
+        estimatedCostUsd,
+        completedAt: nowOf(deps),
+      },
+      {
+        ...(summary
+          ? {
+              summary: {
+                investigationId: input.investigationId,
+                ...summary,
+                model,
+                promptVersion: prompt.version,
+                sourceTaskId: task.id,
+                createdBy: actor.userId,
+              },
+            }
+          : {}),
+        ...(input.conversationId && !summary
+          ? {
+              message: {
+                conversationId: input.conversationId,
+                role: "ASSISTANT",
+                content: formatAssistantMessage(input.taskType, validation.output),
+                structuredContent: validation.output,
+                inputTokens: usage.inputTokens,
+                outputTokens: usage.outputTokens,
+              },
+            }
+          : {}),
+      },
+    );
+    if (!completed)
+      return failTask(
+        deps,
+        running,
+        "AI_PERMISSION_DENIED",
+        "The task was cancelled or its research access changed before completion.",
+        usage,
+      );
+    return {
+      ok: true,
+      value: { task: completed.task, output: validation.output, message: completed.message },
+    };
   } catch (error) {
     const aiError = aiErrorFromUnknown(error);
     return failTask(deps, running, aiError.code, aiError.message, usage);
   }
-
-  await deps.store.recordTaskEvent(task.id, "RESULT_STORAGE", "Validated result stored.");
-
-  const completed = await deps.store.updateTask(actor.workspaceId, task.id, {
-    status: "COMPLETED",
-    output: validation.output,
-    inputTokens: usage.inputTokens,
-    outputTokens: usage.outputTokens,
-    estimatedCostUsd,
-    errorMessage: null,
-    failureCode: null,
-    completedAt: nowOf(deps),
-  });
-
-  if (!completed) {
-    return failure("AI_TASK_NOT_FOUND", "The AI task disappeared before it could be completed.");
-  }
-
-  await deps.store.recordTaskEvent(task.id, "TASK_COMPLETED", "AI task completed.", {
-    inputTokens: usage.inputTokens,
-    outputTokens: usage.outputTokens,
-    estimatedCostUsd,
-  });
-
-  return {
-    ok: true,
-    value: { task: completed, output: validation.output, message: assistantMessage },
-  };
 }
 
 export type ChatResult = {
@@ -678,6 +799,7 @@ export async function sendChatMessage(
   investigationId: string,
   conversationId: string,
   rawMessage: string,
+  operationKey: string = randomUUID(),
 ): Promise<DomainResult<ChatResult>> {
   const parsed = chatMessageSchema.safeParse({ message: rawMessage });
 
@@ -694,17 +816,28 @@ export async function sendChatMessage(
     return failure("AI_CONVERSATION_NOT_FOUND", "That AI conversation does not exist.");
   }
 
-  await deps.store.appendMessage({
-    conversationId,
-    role: "USER",
-    content: parsed.data.message,
-    inputTokens: estimateTokens(parsed.data.message),
-  });
+  if (operationKey.length < 8 || operationKey.length > 160)
+    return failure("VALIDATION_FAILED", "The message operation identifier is invalid.");
+  try {
+    await deps.store.appendMessage({
+      conversationId,
+      operationKey: `chat:${actor.userId}:${operationKey}`,
+      actor,
+      role: "USER",
+      content: parsed.data.message,
+      inputTokens: estimateTokens(parsed.data.message),
+    });
+  } catch (error) {
+    const e = aiErrorFromUnknown(error);
+    return failure(e.code, e.message);
+  }
 
   const result = await runAiTask(deps, actor, {
     investigationId,
     conversationId,
     taskType: "ATTACK_SURFACE_ANALYSIS",
+    instruction: parsed.data.message,
+    operationKey: `chat:${actor.userId}:${operationKey}`,
   });
 
   if (!result.ok) {

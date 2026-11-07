@@ -1,6 +1,13 @@
 import "server-only";
+import { persistAgentAssessments } from "./agent-result-store";
+import { createHash } from "node:crypto";
+import { AiError } from "../domain/ai-errors";
+import { AI_DAILY_USER_TOKEN_CAP } from "../domain/ai-budgets";
+import type { AiProviderRequest, AiProviderResponse } from "../application/provider";
+import { PrismaKnowledgeRetrievalStore } from "@/modules/knowledge/infrastructure/prisma-knowledge-retrieval";
 
 import { Prisma } from "@/generated/prisma/client";
+import { lockResearchInvestigation } from "@/modules/shared/infrastructure/research-transaction";
 import type { Capability } from "@/modules/security/domain/capability";
 
 import { transitionAiTask } from "../domain/ai-task-status";
@@ -90,6 +97,11 @@ const taskSelect = {
   promptVersion: true,
   contextVersion: true,
   idempotencyKey: true,
+  executionJobId: true,
+  usageUncertain: true,
+  usageReconciledAt: true,
+  reservedTokens: true,
+  executorToken: true,
   requiredCapabilities: true,
   inputTokenBudget: true,
   outputTokenBudget: true,
@@ -142,11 +154,236 @@ function jsonInput(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNu
 
 export class PrismaAIStore implements AiStore {
   constructor(private readonly db: Db) {}
+  listUncertainUsage(workspaceId: string) {
+    return this.db.aITask.findMany({
+      where: { workspaceId, usageUncertain: true },
+      select: {
+        id: true,
+        status: true,
+        reservedTokens: true,
+        inputTokens: true,
+        outputTokens: true,
+        createdAt: true,
+        completedAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+  }
+
+  async startAttempt(
+    workspaceId: string,
+    taskId: string,
+    sequence: number,
+    request: AiProviderRequest,
+    lease?: { jobId: string; token: string },
+  ) {
+    return this.db.$transaction(async (tx) => {
+      if (lease) {
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "BackgroundJob" WHERE id = ${lease.jobId}::uuid FOR UPDATE`,
+        );
+        if (
+          !(await tx.backgroundJob.findFirst({
+            where: {
+              id: lease.jobId,
+              workspaceId,
+              status: "RUNNING",
+              leaseToken: lease.token,
+              leaseUntil: { gt: new Date() },
+              cancelRequestedAt: null,
+            },
+          }))
+        )
+          throw new AiError("AI_PERMISSION_DENIED");
+      }
+      const task = await tx.aITask.findFirst({
+        where: {
+          id: taskId,
+          workspaceId,
+          status: "RUNNING",
+          ...(lease
+            ? { executionJobId: lease.jobId, executorToken: lease.token }
+            : { executorToken: null }),
+        },
+        select: {
+          id: true,
+          requestedBy: true,
+          investigation: { select: { status: true, project: { select: { status: true } } } },
+        },
+      });
+      if (!task) throw new AiError("AI_TASK_NOT_FOUND");
+      if (
+        task.investigation.status === "ARCHIVED" ||
+        task.investigation.project.status === "ARCHIVED" ||
+        !(await tx.workspaceMember.findUnique({
+          where: { workspaceId_userId: { workspaceId, userId: task.requestedBy } },
+          select: { id: true },
+        }))
+      )
+        throw new AiError("AI_PERMISSION_DENIED");
+      return tx.aIExecutionAttempt.create({
+        data: {
+          workspaceId,
+          taskId,
+          sequence,
+          requestHash: createHash("sha256").update(JSON.stringify(request)).digest("hex"),
+          request: jsonInput(request),
+        },
+        select: { id: true },
+      });
+    });
+  }
+  async finishAttempt(
+    workspaceId: string,
+    attemptId: string,
+    response: AiProviderResponse | null,
+    failureCode?: string,
+  ) {
+    await this.db.aIExecutionAttempt.updateMany({
+      where: { id: attemptId, workspaceId, status: "STARTED" },
+      data: {
+        status: response ? "RECEIVED" : "FAILED",
+        providerRequestId: response?.providerRequestId,
+        inputTokens: response?.usage.inputTokens ?? 0,
+        outputTokens: response?.usage.outputTokens ?? 0,
+        response: response ? jsonInput(response) : Prisma.DbNull,
+        failureCode,
+        completedAt: new Date(),
+      },
+    });
+  }
+  async resultMessage(workspaceId: string, taskId: string) {
+    const message = await this.db.aIMessage.findFirst({
+      where: { sourceTaskId: taskId, conversation: { workspaceId } },
+      select: messageSelect,
+    });
+    return message ? mapMessage(message) : null;
+  }
+  async completeTask(
+    workspaceId: string,
+    taskId: string,
+    data: AiTaskUpdateData,
+    result: { message?: AiMessageCreateData; summary?: AiSessionSummaryCreateData },
+  ) {
+    return this.db.$transaction(async (tx) => {
+      if (data.executionJobId) {
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "BackgroundJob" WHERE id = ${data.executionJobId}::uuid FOR UPDATE`,
+        );
+        if (
+          !(await tx.backgroundJob.findFirst({
+            where: {
+              id: data.executionJobId,
+              workspaceId,
+              status: "RUNNING",
+              leaseToken: data.executorToken,
+              leaseUntil: { gt: new Date() },
+              cancelRequestedAt: null,
+            },
+          }))
+        )
+          return null;
+      }
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "AITask" WHERE id = ${taskId}::uuid AND "workspaceId" = ${workspaceId}::uuid FOR UPDATE`,
+      );
+      const task = await tx.aITask.findFirst({
+        where: {
+          id: taskId,
+          workspaceId,
+          status: "RUNNING",
+          ...(data.executorToken ? { executorToken: data.executorToken } : { executorToken: null }),
+        },
+        select: {
+          id: true,
+          taskType: true,
+          inputContext: true,
+          contextVersion: true,
+          requestedBy: true,
+          investigationId: true,
+          conversationId: true,
+          investigation: { select: { status: true, project: { select: { status: true } } } },
+        },
+      });
+      if (
+        !task ||
+        task.investigation.status === "ARCHIVED" ||
+        task.investigation.project.status === "ARCHIVED"
+      )
+        return null;
+      if (
+        !(await tx.workspaceMember.findUnique({
+          where: { workspaceId_userId: { workspaceId, userId: task.requestedBy } },
+          select: { id: true },
+        }))
+      )
+        return null;
+      let message: AiMessageRow | null = null;
+      if (result.message) {
+        if (result.message.conversationId !== task.conversationId)
+          throw new AiError("AI_PERMISSION_DENIED");
+        message = mapMessage(
+          await tx.aIMessage.create({
+            data: {
+              ...result.message,
+              structuredContent: jsonInput(result.message.structuredContent),
+              sourceTaskId: taskId,
+            },
+            select: messageSelect,
+          }),
+        );
+      }
+      if (result.summary) {
+        const summary = result.summary;
+        if (summary.investigationId !== task.investigationId || summary.sourceTaskId !== task.id)
+          throw new AiError("AI_PERMISSION_DENIED");
+        const saved = await tx.sessionSummary.create({
+          data: { ...summary, generatedByType: "AI" },
+          select: { id: true },
+        });
+        await tx.auditLog.create({
+          data: {
+            workspaceId,
+            userId: task.requestedBy,
+            action: "SESSION_SUMMARY_CREATED",
+            entityType: "SessionSummary",
+            entityId: saved.id,
+            metadata: { sourceTaskId: taskId },
+          },
+        });
+      }
+      await persistAgentAssessments(tx, task, workspaceId, data.output);
+      const completed = await tx.aITask.update({
+        where: { id: taskId },
+        data: {
+          status: "COMPLETED",
+          output: jsonInput(data.output),
+          inputTokens: data.inputTokens ?? 0,
+          outputTokens: data.outputTokens ?? 0,
+          estimatedCostUsd: data.estimatedCostUsd ?? 0,
+          reservedTokens: 0,
+          completedAt: data.completedAt ?? new Date(),
+          failureCode: null,
+          errorMessage: null,
+        },
+        select: taskSelect,
+      });
+      await tx.aITaskEvent.createMany({
+        data: [
+          { taskId, eventType: "RESULT_STORAGE", description: "Validated result stored." },
+          { taskId, eventType: "TASK_COMPLETED", description: "AI task completed." },
+        ],
+      });
+      return { task: mapTask(completed), message };
+    });
+  }
 
   async loadContext(
     workspaceId: string,
     investigationId: string,
     conversationId?: string,
+    requestedBy?: string,
   ): Promise<AiContextRecord | null> {
     const investigation = await this.db.investigation.findFirst({
       where: { id: investigationId, workspaceId },
@@ -159,6 +396,33 @@ export class PrismaAIStore implements AiStore {
         status: true,
         startedAt: true,
         createdAt: true,
+        engagementId: true,
+        engagement: { select: { id: true, name: true, objective: true, status: true } },
+        findings: {
+          orderBy: { updatedAt: "desc" },
+          take: 20,
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            affectedAsset: true,
+            severityRationale: true,
+            status: true,
+            severity: true,
+            impact: true,
+            remediation: true,
+            verificationReviews: {
+              orderBy: { createdAt: "desc" },
+              take: 5,
+              select: { id: true, reviewerType: true, conclusion: true, reasoningSummary: true },
+            },
+          },
+        },
+        decisions: {
+          orderBy: { createdAt: "desc" },
+          take: 30,
+          select: { id: true, kind: true, rationale: true, sourceRefs: true, createdAt: true },
+        },
         project: {
           select: {
             id: true,
@@ -181,6 +445,7 @@ export class PrismaAIStore implements AiStore {
           },
         },
         observations: {
+          take: 100,
           orderBy: { createdAt: "desc" },
           select: {
             id: true,
@@ -193,6 +458,7 @@ export class PrismaAIStore implements AiStore {
           },
         },
         hypotheses: {
+          take: 60,
           orderBy: { updatedAt: "desc" },
           select: {
             id: true,
@@ -209,6 +475,7 @@ export class PrismaAIStore implements AiStore {
           },
         },
         sessionSummaries: {
+          take: 5,
           orderBy: { createdAt: "desc" },
           select: {
             id: true,
@@ -218,6 +485,9 @@ export class PrismaAIStore implements AiStore {
             unresolvedQuestions: true,
             nextActions: true,
             generatedByType: true,
+            sourceTaskId: true,
+            createdBy: true,
+            sourceTask: { select: { conversationId: true } },
             model: true,
             createdAt: true,
           },
@@ -273,7 +543,82 @@ export class PrismaAIStore implements AiStore {
       ? await this.findConversation(workspaceId, conversationId)
       : null;
 
+    const relations = await this.db.investigationRelation.findMany({
+      where: { workspaceId, OR: [{ fromId: investigationId }, { toId: investigationId }] },
+      select: { fromId: true, toId: true, relationship: true, rationale: true },
+      take: 20,
+    });
+    const relatedIds = relations.map((r) => (r.fromId === investigationId ? r.toId : r.fromId));
+    const related = await this.db.investigation.findMany({
+      where: {
+        workspaceId,
+        id: { not: investigationId },
+        OR: [
+          { id: { in: relatedIds } },
+          ...(investigation.engagementId ? [{ engagementId: investigation.engagementId }] : []),
+        ],
+      },
+      select: { id: true, title: true, status: true, objective: true },
+      orderBy: { updatedAt: "desc" },
+      take: 3,
+    });
+    const previous = await this.db.aITask.findMany({
+      where: {
+        workspaceId,
+        investigationId,
+        status: "COMPLETED",
+        taskType: {
+          in: [
+            "RECON_ANALYSIS",
+            "PATTERN_ANALYSIS",
+            "HYPOTHESIS_GENERATION",
+            "EVIDENCE_REVIEW",
+            "FALSE_POSITIVE_REVIEW",
+          ],
+        },
+      },
+      select: { id: true, taskType: true, output: true, model: true, promptVersion: true },
+      orderBy: { completedAt: "desc" },
+      take: 3,
+    });
+    const history = [
+      ...previous.map((t) => ({
+        id: t.id,
+        title: `Prior AI analysis: ${t.taskType}`,
+        status: "COMPLETED",
+        objective: null,
+        sourceType: "AI_TASK",
+        output: t.output,
+        model: t.model,
+        promptVersion: t.promptVersion,
+      })),
+      ...related.map((i) => ({
+        ...i,
+        sourceType: "INVESTIGATION",
+        relations: relations.filter((r) => r.fromId === i.id || r.toId === i.id),
+      })),
+    ];
+    const retrieved = requestedBy
+      ? await new PrismaKnowledgeRetrievalStore(this.db).retrieve(
+          { workspaceId, userId: requestedBy, role: "RESEARCHER" },
+          {
+            investigationId,
+            query: [investigation.category, investigation.title]
+              .filter(Boolean)
+              .join(" ")
+              .slice(0, 500),
+            limit: 8,
+          },
+        )
+      : null;
+
     return {
+      engagement: investigation.engagement,
+      findings: investigation.findings.map((f) => ({ ...f, reviews: f.verificationReviews })),
+      decisions: investigation.decisions,
+      history,
+      knowledge: retrieved?.results ?? [],
+      retrievalId: retrieved?.retrievalId,
       investigation: {
         id: investigation.id,
         title: investigation.title,
@@ -297,6 +642,9 @@ export class PrismaAIStore implements AiStore {
         unresolvedQuestions: stringArray(summary.unresolvedQuestions),
         nextActions: stringArray(summary.nextActions),
         generatedByType: summary.generatedByType,
+        sourceTaskId: summary.sourceTaskId,
+        sourceConversationId: summary.sourceTask?.conversationId ?? null,
+        createdBy: summary.createdBy,
         model: summary.model,
         createdAt: summary.createdAt,
       })),
@@ -381,11 +729,47 @@ export class PrismaAIStore implements AiStore {
     return this.db.$transaction(async (tx) => {
       const conversation = await tx.aIConversation.findFirst({
         where: { id: data.conversationId },
-        select: { id: true },
+        select: { id: true, workspaceId: true, investigationId: true, status: true },
       });
 
       if (!conversation) {
         throw new Error("The conversation does not exist.");
+      }
+      if (data.actor) {
+        if (data.actor.workspaceId !== conversation.workspaceId || conversation.status !== "ACTIVE")
+          throw new AiError("AI_PERMISSION_DENIED");
+        await lockResearchInvestigation(
+          tx,
+          { ...data.actor, role: "RESEARCHER" },
+          conversation.investigationId,
+        );
+      }
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "AIConversation" WHERE id = ${data.conversationId}::uuid FOR UPDATE`,
+      );
+      if (
+        (await tx.aIConversation.findUniqueOrThrow({ where: { id: data.conversationId } }))
+          .status !== "ACTIVE"
+      )
+        throw new AiError("AI_PERMISSION_DENIED");
+      if (data.operationKey) {
+        const old = await tx.aIMessage.findUnique({
+          where: {
+            conversationId_operationKey: {
+              conversationId: data.conversationId,
+              operationKey: data.operationKey,
+            },
+          },
+          select: messageSelect,
+        });
+        if (old) {
+          if (old.content !== data.content || old.role !== data.role)
+            throw new AiError(
+              "AI_PERMISSION_DENIED",
+              "This operation identifier belongs to another message.",
+            );
+          return mapMessage(old);
+        }
       }
 
       const message = await tx.aIMessage.create({
@@ -393,6 +777,7 @@ export class PrismaAIStore implements AiStore {
           conversationId: data.conversationId,
           role: data.role,
           content: data.content,
+          operationKey: data.operationKey,
           ...(data.structuredContent !== undefined
             ? { structuredContent: jsonInput(data.structuredContent) }
             : {}),
@@ -414,12 +799,78 @@ export class PrismaAIStore implements AiStore {
 
   async createTask(data: AiTaskCreateData): Promise<AiTaskRow> {
     return this.db.$transaction(async (tx) => {
-      const investigation = await tx.investigation.findFirst({
-        where: { id: data.investigationId, workspaceId: data.workspaceId },
+      if (
+        data.executionJobId &&
+        !(await tx.backgroundJob.findFirst({
+          where: {
+            id: data.executionJobId,
+            workspaceId: data.workspaceId,
+            requestedBy: data.requestedBy,
+            status: "RUNNING",
+            leaseToken: data.executorToken,
+            leaseUntil: { gt: new Date() },
+          },
+        }))
+      )
+        throw new AiError("AI_PERMISSION_DENIED");
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "User" WHERE id = ${data.requestedBy}::uuid FOR UPDATE`,
+      );
+      const existing = await tx.aITask.findUnique({
+        where: {
+          workspaceId_idempotencyKey: {
+            workspaceId: data.workspaceId,
+            idempotencyKey: data.idempotencyKey,
+          },
+        },
+        select: { ...taskSelect, requestHash: true },
+      });
+      if (existing) {
+        if (
+          existing.requestedBy !== data.requestedBy ||
+          existing.requestHash !== (data.requestHash ?? null)
+        )
+          throw new AiError(
+            "AI_PERMISSION_DENIED",
+            "The operation key belongs to a different request.",
+          );
+        return mapTask(existing);
+      }
+      const member = await tx.workspaceMember.findUnique({
+        where: { workspaceId_userId: { workspaceId: data.workspaceId, userId: data.requestedBy } },
         select: { id: true },
       });
+      if (!member) throw new AiError("AI_PERMISSION_DENIED");
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const tasks = await tx.aITask.findMany({
+        where: {
+          requestedBy: data.requestedBy,
+          OR: [
+            { createdAt: { gte: since } },
+            { completedAt: { gte: since } },
+            { usageReconciledAt: { gte: since } },
+            { reservedTokens: { gt: 0 } },
+          ],
+        },
+        select: { inputTokens: true, outputTokens: true, reservedTokens: true },
+      });
+      const used = tasks.reduce(
+        (total, task) => total + task.inputTokens + task.outputTokens + task.reservedTokens,
+        0,
+      );
+      const reservation = 2 * (data.inputTokenBudget + data.outputTokenBudget);
+      const budgetExceeded = used + reservation > AI_DAILY_USER_TOKEN_CAP;
 
-      if (!investigation) {
+      const investigation = await tx.investigation.findFirst({
+        where: { id: data.investigationId, workspaceId: data.workspaceId },
+        select: { id: true, status: true, project: { select: { status: true } } },
+      });
+
+      if (
+        !investigation ||
+        investigation.status === "ARCHIVED" ||
+        investigation.project.status === "ARCHIVED"
+      ) {
         throw new Error("The investigation does not exist in this workspace.");
       }
 
@@ -429,7 +880,13 @@ export class PrismaAIStore implements AiStore {
           investigationId: data.investigationId,
           conversationId: data.conversationId,
           taskType: data.taskType,
-          status: "PENDING",
+          status: budgetExceeded ? "FAILED" : "PENDING",
+          failureCode: budgetExceeded ? "AI_BUDGET_EXCEEDED" : null,
+          completedAt: budgetExceeded ? new Date() : null,
+          reservedTokens: budgetExceeded ? 0 : reservation,
+          requestHash: data.requestHash,
+          executionJobId: data.executionJobId,
+          executorToken: data.executorToken,
           assignedRole: data.assignedRole,
           provider: data.provider,
           model: data.model,
@@ -481,12 +938,26 @@ export class PrismaAIStore implements AiStore {
     data: AiTaskUpdateData,
   ): Promise<AiTaskRow | null> {
     return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "AITask" WHERE id = ${taskId}::uuid AND "workspaceId" = ${workspaceId}::uuid FOR UPDATE`,
+      );
+
       const existing = await tx.aITask.findFirst({
         where: { id: taskId, workspaceId },
-        select: { id: true, status: true },
+        select: {
+          id: true,
+          status: true,
+          reservedTokens: true,
+          usageUncertain: true,
+          requestedBy: true,
+        },
       });
 
-      if (!existing) {
+      if (
+        !existing ||
+        ["COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"].includes(existing.status) ||
+        (data.status === "RUNNING" && existing.status !== "PENDING")
+      ) {
         return null;
       }
 
@@ -498,8 +969,88 @@ export class PrismaAIStore implements AiStore {
         }
       }
 
+      const terminal = ["COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"].includes(
+        data.status ?? "",
+      );
+      if (data.status === "RUNNING" && data.inputContext) {
+        if (
+          !(await tx.workspaceMember.findUnique({
+            where: { workspaceId_userId: { workspaceId, userId: existing.requestedBy } },
+            select: { id: true },
+          }))
+        )
+          throw new AiError("AI_PERMISSION_DENIED");
+        const manifest = (
+          data.inputContext as {
+            sourceManifest?: { evidenceIds?: string[]; knowledgeIds?: string[] };
+          }
+        ).sourceManifest;
+        const evidenceIds = manifest?.evidenceIds ?? [];
+        if (evidenceIds.length) {
+          await tx.$queryRaw(
+            Prisma.sql`SELECT id FROM "Evidence" WHERE id IN (${Prisma.join(evidenceIds.map((id) => Prisma.sql`${id}::uuid`))}) ORDER BY id FOR SHARE`,
+          );
+          if (
+            (await tx.evidence.count({
+              where: {
+                id: { in: evidenceIds },
+                workspaceId,
+                deletedAt: null,
+                storageKey: { not: null },
+                redactionStatus: { in: ["REDACTED", "VERIFIED_SAFE"] },
+              },
+            })) !== new Set(evidenceIds).size
+          )
+            throw new AiError(
+              "AI_PERMISSION_DENIED",
+              "An evidence source changed before request capture.",
+            );
+        }
+        const knowledgeIds = manifest?.knowledgeIds ?? [];
+        if (
+          knowledgeIds.length &&
+          (await tx.knowledgeChunk.count({
+            where: {
+              id: { in: knowledgeIds },
+              workspaceId,
+              document: { reviewStatus: "REVIEWED" },
+            },
+          })) !== new Set(knowledgeIds).size
+        )
+          throw new AiError(
+            "AI_PERMISSION_DENIED",
+            "A knowledge source was withdrawn before request capture.",
+          );
+      }
+      const uncertainAttempt = terminal
+        ? await tx.aIExecutionAttempt.count({
+            where: {
+              taskId,
+              OR: [
+                { status: "STARTED" },
+                {
+                  status: "FAILED",
+                  failureCode: { in: ["AI_TIMEOUT", "AI_PROVIDER_ERROR", "AI_INVALID_OUTPUT"] },
+                },
+              ],
+            },
+          })
+        : 0;
+      const uncertain = existing.usageUncertain || uncertainAttempt > 0;
+      const captured = terminal
+        ? await tx.aIExecutionAttempt.aggregate({
+            where: { taskId },
+            _sum: { inputTokens: true, outputTokens: true },
+          })
+        : null;
       const update: Prisma.AITaskUncheckedUpdateInput = {
+        ...(terminal
+          ? { reservedTokens: uncertain ? existing.reservedTokens : 0, usageUncertain: uncertain }
+          : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.executionJobId
+          ? { executionJobId: data.executionJobId, executorToken: data.executorToken }
+          : {}),
         ...(data.model !== undefined ? { model: data.model } : {}),
         ...(data.promptTemplateId !== undefined ? { promptTemplateId: data.promptTemplateId } : {}),
         ...(data.promptVersion !== undefined ? { promptVersion: data.promptVersion } : {}),
@@ -508,8 +1059,15 @@ export class PrismaAIStore implements AiStore {
         ...(data.output !== undefined ? { output: jsonInput(data.output) } : {}),
         ...(data.errorMessage !== undefined ? { errorMessage: data.errorMessage } : {}),
         ...(data.failureCode !== undefined ? { failureCode: data.failureCode } : {}),
-        ...(data.inputTokens !== undefined ? { inputTokens: data.inputTokens } : {}),
-        ...(data.outputTokens !== undefined ? { outputTokens: data.outputTokens } : {}),
+        ...(terminal
+          ? {
+              inputTokens: Math.max(data.inputTokens ?? 0, captured?._sum.inputTokens ?? 0),
+              outputTokens: Math.max(data.outputTokens ?? 0, captured?._sum.outputTokens ?? 0),
+            }
+          : {
+              ...(data.inputTokens !== undefined ? { inputTokens: data.inputTokens } : {}),
+              ...(data.outputTokens !== undefined ? { outputTokens: data.outputTokens } : {}),
+            }),
         ...(data.estimatedCostUsd !== undefined ? { estimatedCostUsd: data.estimatedCostUsd } : {}),
         ...(data.startedAt !== undefined ? { startedAt: data.startedAt } : {}),
         ...(data.completedAt !== undefined ? { completedAt: data.completedAt } : {}),

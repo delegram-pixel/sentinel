@@ -7,6 +7,8 @@ import {
   InvestigationDetailView,
 } from "@/components/research/investigation-detail";
 import { getDb } from "@/lib/db";
+import { ResearchDecisions } from "@/components/research/research-decisions";
+import { PrismaDecisionStore } from "@/modules/research/infrastructure/prisma-decision-store";
 import { getSessionContext } from "@/lib/session";
 import { listEvidence } from "@/modules/evidence/application/evidence-service";
 import { PrismaEvidenceStore } from "@/modules/evidence/infrastructure/prisma-evidence-store";
@@ -51,21 +53,45 @@ async function InvestigationContent({ investigationId }: { investigationId: stri
     notFound();
   }
 
-  const [findings, evidence] = await Promise.all([
+  const [findings, evidence, decisions] = await Promise.all([
     listFindings(new PrismaFindingStore(getDb()), session.workspace.id, investigation.id),
     listEvidence(
       new PrismaEvidenceStore(getDb()),
       { userId: session.user.id, workspaceId: session.workspace.id, role: session.role },
       investigation.id,
     ),
+    new PrismaDecisionStore(getDb()).list(session.workspace.id, investigation.id),
   ]);
 
   return (
-    <InvestigationDetailView
-      investigation={investigation}
-      canEdit={project.status !== "ARCHIVED"}
-      findings={findings}
-      evidence={evidence}
-    />
+    <div className="page-stack">
+      <InvestigationDetailView
+        investigation={investigation}
+        canEdit={project.status !== "ARCHIVED"}
+        findings={findings}
+        evidence={evidence}
+      />
+      <ResearchDecisions
+        investigation={investigation}
+        decisions={decisions}
+        canEdit={project.status !== "ARCHIVED" && investigation.status !== "ARCHIVED"}
+        sources={[
+          ...investigation.observations.map((o) => ({
+            value: `OBSERVATION:${o.id}`,
+            label: `Observation: ${o.title}`,
+          })),
+          ...investigation.hypotheses.map((h) => ({
+            value: `HYPOTHESIS:${h.id}`,
+            label: `Hypothesis: ${h.title}`,
+          })),
+          ...evidence
+            .filter(
+              (e) => e.redactionStatus === "REDACTED" || e.redactionStatus === "VERIFIED_SAFE",
+            )
+            .map((e) => ({ value: `EVIDENCE:${e.id}`, label: `Evidence: ${e.title}` })),
+          ...findings.map((f) => ({ value: `FINDING:${f.id}`, label: `Finding: ${f.title}` })),
+        ]}
+      />
+    </div>
   );
 }

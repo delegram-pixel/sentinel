@@ -1,4 +1,5 @@
 import type { AuditEvent } from "@/modules/audit/domain/audit";
+import type { ResearchActor } from "@/modules/shared/application/actor";
 
 import type { FindingStatus } from "@/modules/findings/domain/finding-status";
 
@@ -35,6 +36,8 @@ export type EvidenceRow = {
   fileSize: number;
   checksum: string;
   source: string | null;
+  collector?: string | null;
+  collectedAt?: Date | null;
   redactionStatus: RedactionStatus;
   redactionMethod: RedactionMethod;
   scanFindings: unknown;
@@ -42,6 +45,7 @@ export type EvidenceRow = {
   redactionReviewedBy: string | null;
   redactionReviewedAt: Date | null;
   activatedAt: Date | null;
+  uploadValidatedAt?: Date | null;
   version: number;
   supersedesId: string | null;
   deletedAt: Date | null;
@@ -95,6 +99,9 @@ export type EvidenceMetadataUpdateData = {
 };
 
 export type EvidenceActivationData = {
+  executionLease?: { jobId: string; token: string };
+  expectedChecksum?: string;
+  expectedVersion?: number;
   storageKey: string;
   redactionStatus: RedactionStatus;
   redactionMethod: RedactionMethod;
@@ -117,6 +124,11 @@ export type EvidenceFindingLookup = {
 };
 
 export type EvidenceStore = {
+  prepareActivation(
+    actor: ResearchActor,
+    evidenceId: string,
+    data: EvidenceActivationData,
+  ): Promise<{ id: string }>;
   findInvestigation(
     workspaceId: string,
     investigationId: string,

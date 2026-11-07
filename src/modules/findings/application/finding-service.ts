@@ -1,3 +1,4 @@
+import { removeResearchEvidenceLink } from "@/modules/evidence/application/relationship-service";
 import { failure, type DomainResult } from "@/modules/shared/domain/result";
 import type { WorkspaceRole } from "@/modules/workspaces/domain/ownership";
 import {
@@ -232,6 +233,7 @@ export async function updateFinding(
     actor.workspaceId,
     findingId,
     {
+      expectedUpdatedAt: existing.updatedAt,
       hypothesisId: parsed.data.hypothesisId ?? null,
       title: parsed.data.title,
       titleNormalized: normalizeFindingTitle(parsed.data.title),
@@ -305,6 +307,7 @@ export async function assessFindingSeverity(
     actor.workspaceId,
     findingId,
     {
+      expectedUpdatedAt: existing.updatedAt,
       severity: parsed.data.severity,
       severityRationale: parsed.data.severityRationale ?? null,
       affectedAsset: parsed.data.affectedAsset ?? existing.affectedAsset,
@@ -378,7 +381,11 @@ export async function changeFindingStatus(
   }
 
   const findingActor: FindingActor =
-    next === "REPORTABLE" ? (isReviewer(actor.role) ? "REVIEWER" : "RESEARCHER") : "RESEARCHER";
+    next === "REPORTABLE" || next === "CLOSED"
+      ? isReviewer(actor.role)
+        ? "REVIEWER"
+        : "RESEARCHER"
+      : "RESEARCHER";
   const transition = transitionFinding(existing.status, next, findingActor);
 
   if (!transition.ok) {
@@ -412,7 +419,9 @@ export async function changeFindingStatus(
     actor.workspaceId,
     findingId,
     {
+      expectedUpdatedAt: existing.updatedAt,
       status: next,
+      rationale: parsed.data.rationale,
       resolutionReason: null,
       ...(next === "REPORTABLE" ? { approvedBy: actor.userId, approvedAt: now } : {}),
     },
@@ -494,6 +503,7 @@ export async function reviewFinding(
 
   const review = await store.createVerificationReview(
     {
+      expectedUpdatedAt: existing.updatedAt,
       findingId,
       reviewerType: "HUMAN",
       reviewerUserId: actor.userId,
@@ -701,15 +711,11 @@ export async function removeEvidenceLink(
   actor: Phase6Actor,
   linkId: string,
 ): Promise<DomainResult<true>> {
-  const removed = await store.removeEvidenceLink(
-    actor.workspaceId,
-    linkId,
-    auditDraft(actor, "EVIDENCE_LINK_REMOVED", "EvidenceLink", {
-      previousValue: { linkId },
-    }),
+  return removeResearchEvidenceLink(() =>
+    store.removeEvidenceLink(
+      actor.workspaceId,
+      linkId,
+      auditDraft(actor, "EVIDENCE_LINK_REMOVED", "EvidenceLink", { previousValue: { linkId } }),
+    ),
   );
-
-  return removed
-    ? { ok: true, value: true }
-    : failure("EVIDENCE_LINK_NOT_FOUND", "That evidence link does not exist.");
 }

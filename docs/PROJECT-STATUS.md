@@ -1,6 +1,16 @@
 # Project checkpoint
 
-Updated: 6 November 2026.
+Updated: 7 November 2026.
+
+## V2 implementation checkpoint
+
+The user's instruction to build V2 authorized implementation after the architecture audit. The working tree now includes engagement/scope associations, research decisions, reviewed knowledge/full-text retrieval, persistent AI jobs and execution snapshots, six logical analytical agents, evidence provenance/relationships/recovery, supplied JSON/CSV/SARIF imports, manual remediation/retests/outcomes, AI draft adoption and research insights. Existing V1 models, routes, human approval authority and deterministic report exports remain in use.
+
+See [V2 implementation status](v2/V2_IMPLEMENTATION_STATUS.md) for coverage, acceptance results and explicit remaining work, and [V2 operations](v2/V2_OPERATIONS.md) for migration/backfill/worker instructions. ADR-028–030 supersede the historical V1 exclusions of reviewed AI report drafts and document additive compatibility rules. Production migrations/deployment have not been performed.
+
+V2 verification: TypeScript, lint, Prisma validation, 213 unit tests, 86 PostgreSQL integration tests and the production Webpack build pass. Chromium guest smoke checks pass 10 tests; 3 signed-in checks are skipped without a saved Clerk development session. Default Turbopack execution remains restricted by the environment's CSS-worker port binding. Optional semantic retrieval, live-model quality measurements, restored production-data rehearsal and signed-in workflow acceptance remain outstanding.
+
+The sections below retain the previous V1 checkpoint as historical context. Their old “next work”, test counts and policy descriptions are superseded by the V2 checkpoint and accepted ADRs.
 
 ## Current stage
 
@@ -225,13 +235,14 @@ workspace at `/dashboard/investigations/[investigationId]/ai`. Reports are live 
 
 - `yarn typecheck` passes.
 - `yarn lint` passes.
-- 180 unit tests pass across 23 files.
-- 64 PostgreSQL integration tests pass across 11 files against the disposable local `sentinel_test`
-  database, including the Phase 6 finding and evidence suites and the reports suite. The test
-  database is migrated with `prisma migrate deploy`; integration tests never use Neon.
+- 188 unit tests pass across 24 files.
+- 67 PostgreSQL integration tests pass across 11 files against the disposable local `sentinel_test`
+  database, including the Phase 6 finding and evidence suites, the reports suite, and AI evidence
+  context. The test database is migrated with `prisma migrate deploy`; integration tests never use
+  Neon.
 - `yarn build` passes with the default Turbopack compiler, Cache Components, and partial
   prefetching. All Phase 6 and report routes are present, including
-  `/api/reports/[reportId]/export`.
+  `/dashboard/reports/templates` and `/api/reports/[reportId]/export` for Markdown and PDF.
 - The browser suite passes: 4 guest checks run and 3 authenticated checks are skipped without
   `CLERK_E2E_STORAGE_STATE`.
 - Integration tests alias the `server-only` marker to an empty module because they run outside a

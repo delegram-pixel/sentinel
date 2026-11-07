@@ -287,7 +287,11 @@ export async function changeFindingStatusAction(
     new PrismaFindingStore(getDb()),
     { userId: session.user.id, workspaceId: session.workspace.id, role: session.role },
     findingId,
-    { status, resolutionReason: resolutionReason || undefined },
+    {
+      status,
+      resolutionReason: resolutionReason || undefined,
+      rationale: stringValue(formData, "rationale") || undefined,
+    },
   );
 
   if (!result.ok) {

@@ -203,6 +203,7 @@ export type ReportEvidenceInput = {
 
 export type ReportFindingInput = {
   id: string;
+  sourceUpdatedAt?: string;
   title: string;
   description: string;
   status: FindingStatus;

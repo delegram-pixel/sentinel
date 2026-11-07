@@ -116,6 +116,54 @@ function intentFor(investigationId: string, body: Buffer, overrides: Record<stri
 }
 
 describe("evidence lifecycle", () => {
+  it("shares approved evidence with workspace researchers while keeping quarantine and foreign workspaces private", () =>
+    withRollback(client, async (tx) => {
+      const tenancy = await createTenancy(tx);
+      const foreign = await createTenancy(tx);
+      await tx.workspaceMember.create({
+        data: { workspaceId: tenancy.workspace.id, userId: foreign.user.id, role: "RESEARCHER" },
+      });
+      const peer = {
+        workspaceId: tenancy.workspace.id,
+        userId: foreign.user.id,
+        role: "RESEARCHER" as const,
+      };
+      const outsider = { ...peer, workspaceId: foreign.workspace.id };
+      const store = new PrismaEvidenceStore(tx);
+      const pending = await tx.evidence.create({
+        data: {
+          workspaceId: tenancy.workspace.id,
+          investigationId: tenancy.investigation.id,
+          title: "Pending source",
+          fileName: "pending.txt",
+          evidenceType: "LOG",
+          mimeType: "text/plain",
+          fileSize: 20,
+          checksum: "d".repeat(64),
+          quarantineKey: "quarantine/pending",
+          uploadedBy: tenancy.user.id,
+        },
+      });
+      const approved = await tx.evidence.create({
+        data: {
+          workspaceId: tenancy.workspace.id,
+          investigationId: tenancy.investigation.id,
+          title: "Reviewed source",
+          fileName: "reviewed.txt",
+          evidenceType: "LOG",
+          mimeType: "text/plain",
+          fileSize: 20,
+          checksum: "e".repeat(64),
+          storageKey: "active/reviewed",
+          uploadValidatedAt: new Date(),
+          redactionStatus: "VERIFIED_SAFE",
+          uploadedBy: tenancy.user.id,
+        },
+      });
+      expect(await getEvidence(store, peer, pending.id)).toBeNull();
+      expect((await getEvidence(store, peer, approved.id))?.id).toBe(approved.id);
+      expect(await getEvidence(store, outsider, approved.id)).toBeNull();
+    }));
   it("uploads to quarantine, activates after human review, links, and blocks deletion while linked", async () => {
     const result = await withRollback(client, async (tx) => {
       const tenancy = await createTenancy(tx);

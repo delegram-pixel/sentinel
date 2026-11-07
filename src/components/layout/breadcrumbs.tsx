@@ -26,6 +26,12 @@ const SEGMENT_LABELS: Record<string, string> = {
   evidence: "Evidence",
   reports: "Reports",
   settings: "Settings",
+  engagements: "Engagements",
+  knowledge: "Knowledge",
+  imports: "Tool imports",
+  remediation: "Remediation & outcomes",
+  tasks: "Background work",
+  insights: "Research insights",
   ai: "AI assistance",
   upload: "Upload",
   new: "New",
@@ -40,6 +46,9 @@ const RECORD_LABELS: Record<string, string> = {
   findings: "Finding",
   evidence: "Evidence record",
   reports: "Report",
+  engagements: "Engagement",
+  knowledge: "Knowledge document",
+  imports: "Tool import",
 };
 
 function labelForSegment(segment: string, previous?: string): string {

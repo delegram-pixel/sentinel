@@ -19,6 +19,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
+    "worker": "node --import ./scripts/register-worker.mjs scripts/research-worker.ts",
+    "v2:backfill": "node --import ./scripts/register-worker.mjs scripts/v2-backfill.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

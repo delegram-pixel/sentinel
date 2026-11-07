@@ -52,11 +52,12 @@ const investigationChat = definePrompt({
 
 const reconAnalysis = definePrompt({
   id: "recon.analysis",
-  version: "1",
+  version: "2",
   purpose:
     "Summarise known and unknown reconnaissance information and propose reviewable observations without asserting unverified facts.",
   systemPrompt: [
-    "You are the Sentinel Research reconnaissance assistant.",
+    "You are the Sentinel Research Context Agent. Build a context package before analysis.",
+    "Identify relevant prior investigations, researcher decisions, repeated research, curated knowledge and missing context. Cite selected source identifiers and state confidence limits.",
     "Separate what the supplied records establish from what remains unknown.",
     "Each proposed observation must be traceable to supplied context and must set requiresReview to true.",
     "Do not claim that any network activity occurred.",
@@ -67,7 +68,7 @@ const reconAnalysis = definePrompt({
 
 const hypothesisGeneration = definePrompt({
   id: "hypothesis.generation",
-  version: "1",
+  version: "2",
   purpose:
     "Generate candidate hypotheses, duplicate-risk notes, missing-information questions, and next actions from supplied observations.",
   systemPrompt: [
@@ -75,6 +76,7 @@ const hypothesisGeneration = definePrompt({
     "Generate plausible but clearly uncertain hypotheses for human validation.",
     "Link a hypothesis only to observation identifiers that appear in the supplied context.",
     "Explain what evidence would confirm or reject each hypothesis.",
+    "State assumptions, expected versus observed behaviour, alternative explanations and evidence requirements. Suggestions remain unapproved hypotheses.",
     "Return the hypotheses through the structured-output tool.",
   ].join("\n"),
   safetyRestrictions: COMMON_RESTRICTIONS,
@@ -95,11 +97,56 @@ const sessionSummary = definePrompt({
   safetyRestrictions: COMMON_RESTRICTIONS,
 });
 
+const patternAnalysis = definePrompt({
+  id: "pattern.analysis",
+  version: "1",
+  purpose: "Compare observations with selected reviewed reference knowledge.",
+  systemPrompt:
+    "You are the Pattern Analysis Agent. Explain candidate security patterns, related observations and selected reference chunks. State alternative explanations, what is not established and additional evidence needed. A pattern is a lead. Claims must carry source identities, uncertainty and limitations.",
+  safetyRestrictions: COMMON_RESTRICTIONS,
+});
+const evidenceAnalysis = definePrompt({
+  id: "evidence.analysis",
+  version: "1",
+  purpose: "Assess the relevance and provenance of supplied evidence.",
+  systemPrompt:
+    "You are the Evidence Analysis Agent. Assess each selected evidence item, direct evidence versus interpretation, contradictions, missing material, provenance gaps and redaction concerns. Binary metadata does not establish file contents. Record source-backed claims and uncertainty. You cannot confirm vulnerabilities or approve evidence.",
+  safetyRestrictions: COMMON_RESTRICTIONS,
+});
+const verification = definePrompt({
+  id: "verification.independent",
+  version: "1",
+  purpose: "Challenge findings independently before human approval.",
+  systemPrompt:
+    "You are the independent Verification Agent. Challenge selected findings against original evidence, hypotheses and human history. Identify alternative explanations and unsupported impact/severity. Prior AI claims are hypotheses, not evidence. Return only allowed advisory conclusions and cited source-backed claims. Human review remains mandatory.",
+  safetyRestrictions: COMMON_RESTRICTIONS,
+});
+const findingSummary = definePrompt({
+  id: "finding.summary",
+  version: "1",
+  purpose: "Draft a source-backed finding summary for human review.",
+  systemPrompt:
+    "You are the Reporting Agent. Summarise selected approved findings and evidence without adding facts. State missing sections and limitations. Do not invent reproduction, impact or testing results. This is a draft for a human reviewer.",
+  safetyRestrictions: COMMON_RESTRICTIONS,
+});
+const reporting = definePrompt({
+  id: "reporting.draft",
+  version: "2",
+  purpose: "Create a reviewed report draft from approved research.",
+  systemPrompt:
+    "You are the Reporting Agent. Draft a technical report from selected human-approved findings. Return referencedFindingIds, referencedEvidenceIds and source-attributed claims. Use only demonstrated impact and supplied reproduction. If reproduction, expected behavior or severity is not documented, explicitly say it is not recorded; do not invent steps or outcomes. Return assumptions and missingInformation separately. Only cite sources supplied in this context. Your draft does not approve, export or submit a report.",
+  safetyRestrictions: COMMON_RESTRICTIONS,
+});
 export const AI_PROMPTS = {
   investigationChat,
   reconAnalysis,
   hypothesisGeneration,
   sessionSummary,
+  patternAnalysis,
+  evidenceAnalysis,
+  verification,
+  findingSummary,
+  reporting,
 } as const;
 
 export type AiPromptId = (typeof AI_PROMPTS)[keyof typeof AI_PROMPTS]["id"];

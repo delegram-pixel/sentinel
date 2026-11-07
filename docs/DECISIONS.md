@@ -1489,3 +1489,40 @@ ADR-008 makes Markdown the canonical report format and requires a versioned temp
 - `PRD.md` §4.9: note that PDF is a derived basic export and Markdown remains canonical.
 - `DEVELOPMENT-READINESS-REPORT.md` M-37: mark PDF export resolved by ADR-027.
 - `DATABASE-SCHEMA.md` §5: note that system templates are seeded read-only and workspace templates are versioned by name.
+
+---
+
+## ADR-028 — V2 compatibility, research authority and additive migration
+
+**Status:** Accepted
+**Date:** 2026-11-07
+**Authority:** User instruction to build V2 following the architecture audit.
+
+Engagements belong to an existing project; projects may contain several engagements. Existing project, target, investigation, evidence, review, conversation, task and report identities and URLs remain compatible. Engagement assets reference existing targets. Authorization associations reference existing ScopeVersion records; these associations and engagement status never grant testing permission. ScopeVersion remains the authority and every implemented capability gate remains enforced.
+
+The investigation research phase supplements its existing status. Closing research records a human rationale and does not confirm a finding. Existing COMPLETED investigations are not converted to confirmed findings. Research decisions are attributable records with explicit supporting/contradictory sources. Existing Finding/VerificationReview lifecycles remain the human approval authority. Workspace owner, administrator and reviewer roles may review knowledge and findings; any current member may document research. Mutations recheck membership server-side.
+
+Knowledge stores supplied original material, source dates/URL where known, and human review status. AI interpretations start as drafts and never become trusted references automatically. Content is immutable; corrections use new documents and a SUPERSEDES relationship. Tenant composite foreign keys and parent checks protect associations. The legacy backfill is bounded, resumable and idempotent. It retains original approval states and author types, creates draft legacy engagements, and never invents collection dates, collectors or historical AI context.
+
+New evidence activation requires persisted upload validation. Historical approved evidence remains readable without fabricating that validation. Both V1 evidence-link presentation paths use one transaction implementation; it serializes changes with finding review and prevents removal of the last supporting evidence from an approved finding. Consequential finding/report changes check the previously read version and current readiness inside the write transaction.
+
+Migrations are additive and rehearsed on disposable local databases. Rollback means reverting application readers while leaving additive data in place; destructive down-migrations are excluded. Production migration/deployment remains a separate operator action.
+
+## ADR-029 — Durable internal work and traceable model execution
+
+**Status:** Accepted
+**Date:** 2026-11-07
+
+Reuse AITask/AITaskEvent as analytical run identity. Persist immutable input snapshots in task context, exact source manifests and separately attributable provider attempts. An optional database job runner in the same monolith claims bounded jobs with leases, heartbeat, retries and cancellation. It executes only registered supplied-data operations. It does not run terminal commands, browse targets, scan assets or submit reports.
+
+Reserve rolling usage budgets atomically per user, use stable operation keys, and account for corrective calls. Results, assistant messages/session summaries and task completion commit together. Logical agents retain distinct output contracts and source validation. Missing production provider configuration yields an explicit unavailable result; it must never fall back silently to mock analysis. Reviewed knowledge retrieval uses workspace and engagement filters before ranking. Full-text retrieval works without pgvector; semantic retrieval is an optional later provider configuration. The AI infrastructure context projection may join domain records read-only as a deliberate cross-domain read model; domain mutations continue through their owners.
+
+## ADR-030 — Reviewable analytical agents and reporting drafts
+
+**Status:** Accepted
+**Date:** 2026-11-07
+**Authority:** User instruction to build the revised V2 architecture.
+
+Six logical responsibilities reuse V1 task identities: RECON_ANALYSIS is the Research Context Agent; PATTERN_ANALYSIS, HYPOTHESIS_GENERATION, EVIDENCE_REVIEW, FALSE_POSITIVE_REVIEW and REPORT_GENERATION provide pattern, hypothesis, evidence, independent verification and reporting analysis. They perform reasoning over supplied sources only. Guided requests and delegated staged requests are recorded in durable job payloads. Every stage retains its own exact context, model attempts and validated output. Human adoption creates draft hypotheses or explicitly labelled AI observations and a source-linked research decision.
+
+This amends ADR-027's exclusion of AI-authored content: an explicitly adopted AI report draft may become an AI_ASSISTED report revision with source-task/prompt/model provenance. Subsequent human edits create further revisions. The existing deterministic report renderer and template path remain available. Human approval, source readiness and immutable approved Markdown remain mandatory; no agent can confirm, approve, export or submit its own work.

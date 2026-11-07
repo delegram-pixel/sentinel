@@ -293,6 +293,8 @@ export type InvestigationListRow = {
 };
 
 export type InvestigationDetail = InvestigationListRow & {
+  engagementId?: string | null;
+  phase?: import("../domain/research-decision").ResearchPhaseInput["expectedPhase"];
   observations: ObservationRow[];
   hypotheses: HypothesisRow[];
   summaries: SessionSummaryRow[];

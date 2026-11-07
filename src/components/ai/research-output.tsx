@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { AgentResearchOutput } from "./agent-research-output";
+import { ResearchActionForm } from "@/components/research/research-action-form";
+import { adoptSuggestionAction } from "@/app/(dashboard)/dashboard/investigations/adoption";
 
 import { EvidenceReference } from "@/components/shared/evidence-reference";
 import { ResearchPoints } from "@/components/shared/research-points";
@@ -51,10 +54,12 @@ export function ResearchOutput({
   output,
   investigationId,
   fallback,
+  sourceTaskId,
 }: {
   output: unknown;
   investigationId: string;
   fallback?: string;
+  sourceTaskId?: string;
 }) {
   const hypotheses = hypothesisGenerationOutputSchema.safeParse(output);
   if (hypotheses.success)
@@ -89,6 +94,22 @@ export function ResearchOutput({
                 observations={hypothesis.supportingObservationIds}
                 investigationId={investigationId}
               />
+              {sourceTaskId ? (
+                <ResearchActionForm
+                  action={adoptSuggestionAction}
+                  hidden={{ taskId: sourceTaskId, index: String(index), kind: "HYPOTHESIS" }}
+                  submitLabel="Adopt hypothesis for research"
+                  fields={[
+                    {
+                      name: "rationale",
+                      label: "Adoption rationale",
+                      type: "textarea",
+                      required: true,
+                      maxLength: 2000,
+                    },
+                  ]}
+                />
+              ) : null}
             </div>
           ))
         ) : (
@@ -213,6 +234,13 @@ export function ResearchOutput({
       </div>
     );
 
+  const agent = <AgentResearchOutput output={output} />;
+  if (
+    output &&
+    typeof output === "object" &&
+    ("patterns" in output || "assessments" in output || "findings" in output)
+  )
+    return agent;
   return (
     <p className="research-copy text-sm">
       {fallback ?? "This task has no structured output available to display."}
