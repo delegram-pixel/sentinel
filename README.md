@@ -136,6 +136,10 @@ the `production` environment. The migration step validates this GitHub value and
 variables to it only for the Prisma subprocess. It does not read credentials from the pulled Vercel
 file. The application continues to use Vercel's pooled `DATABASE_URL` at runtime.
 
+The build's install step also runs `prisma generate`. Prisma's configuration treats a redacted
+database URL as unavailable, allowing client generation without database credentials. Migration and
+introspection commands still require a real datasource URL; the deploy job supplies the GitHub secret.
+
 The values should have these shapes, using your actual role, encoded password, host, and database:
 
 | Vercel variable | Value                                                                                                 |

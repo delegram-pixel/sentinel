@@ -69,3 +69,20 @@ export function parsePostgresUrl(value, variableName) {
 
   return normalized;
 }
+
+/**
+ * Prisma client generation does not require a datasource URL. Treat a redacted
+ * Vercel Secret as unavailable; database commands still require a real URL.
+ *
+ * @param {Record<string, string | undefined>} source
+ * @returns {string | undefined}
+ */
+export function resolvePrismaDatasourceUrl(source) {
+  const directUrl = source.DIRECT_URL?.trim();
+  const variableName = directUrl ? "DIRECT_URL" : "DATABASE_URL";
+  const value = directUrl || source.DATABASE_URL?.trim();
+
+  if (value === "[SENSITIVE]") return undefined;
+
+  return parsePostgresUrl(value, variableName);
+}

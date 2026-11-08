@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parsePostgresUrl } from "../../scripts/database-url.mjs";
+import { parsePostgresUrl, resolvePrismaDatasourceUrl } from "../../scripts/database-url.mjs";
 
 describe("Prisma database URL configuration", () => {
   it.each([undefined, "", " \t\n"])("treats %j as absent", (value) => {
@@ -72,5 +72,45 @@ describe("Prisma database URL configuration", () => {
     expect((error as Error).message).toMatch(reason);
     expect((error as Error).message).not.toContain(value);
     expect((error as Error).message).not.toContain("secret");
+  });
+});
+
+describe("optional Prisma datasource for client generation", () => {
+  const directUrl = "postgresql://user:pass@localhost/sentinel";
+
+  it.each([
+    {},
+    { DIRECT_URL: "[SENSITIVE]", DATABASE_URL: "[SENSITIVE]" },
+    { DATABASE_URL: "[SENSITIVE]" },
+    { DIRECT_URL: "[SENSITIVE]", DATABASE_URL: directUrl },
+  ])("leaves the datasource unavailable for %j", (source) => {
+    expect(resolvePrismaDatasourceUrl(source)).toBeUndefined();
+  });
+
+  it("uses the real direct URL before DATABASE_URL", () => {
+    expect(
+      resolvePrismaDatasourceUrl({ DIRECT_URL: ` \n${directUrl}\n `, DATABASE_URL: "[SENSITIVE]" }),
+    ).toBe(directUrl);
+  });
+
+  it("falls back to DATABASE_URL when DIRECT_URL is blank", () => {
+    expect(resolvePrismaDatasourceUrl({ DIRECT_URL: " \n ", DATABASE_URL: directUrl })).toBe(
+      directUrl,
+    );
+  });
+
+  it("rejects a malformed direct URL even when DATABASE_URL is valid", () => {
+    expect(() =>
+      resolvePrismaDatasourceUrl({
+        DIRECT_URL: "postgresql://localhost:PORT/sentinel",
+        DATABASE_URL: directUrl,
+      }),
+    ).toThrow(/DIRECT_URL must be a raw PostgreSQL connection URL/);
+  });
+
+  it("validates DATABASE_URL when it supplies the datasource", () => {
+    expect(() =>
+      resolvePrismaDatasourceUrl({ DATABASE_URL: "psql postgresql://localhost/sentinel" }),
+    ).toThrow(/DATABASE_URL must be a raw PostgreSQL connection URL/);
   });
 });

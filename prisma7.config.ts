@@ -6,7 +6,7 @@
 // state that migrations require. See docs/DECISIONS.md ADR-018.
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
-import { parsePostgresUrl } from "./scripts/database-url.mjs";
+import { resolvePrismaDatasourceUrl } from "./scripts/database-url.mjs";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -14,9 +14,7 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url:
-      parsePostgresUrl(process.env["DIRECT_URL"], "DIRECT_URL") ??
-      parsePostgresUrl(process.env["DATABASE_URL"], "DATABASE_URL"),
+    url: resolvePrismaDatasourceUrl(process.env),
     shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 });
