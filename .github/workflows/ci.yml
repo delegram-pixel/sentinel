@@ -196,7 +196,8 @@ jobs:
             if (result.error) throw result.error;
             process.exitCode = result.status ?? 1;
           } catch (error) {
-            console.error(error.message);
+            console.error(`::error::${error.message}`);
+            console.error("Database URLs are loaded from Vercel Project Settings > Environment Variables (Production). Correct the named setting there and rerun the deploy job.");
             process.exitCode = 1;
           }
           NODE

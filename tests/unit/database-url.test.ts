@@ -22,12 +22,15 @@ describe("Prisma database URL configuration", () => {
   it.each([
     "psql 'postgresql://user:secret@localhost/sentinel'",
     '"postgresql://user:secret@localhost/sentinel"',
+    'DATABASE_URL="postgresql://user:secret@localhost/sentinel"',
     "postgresql://localhost/",
     "postgresql:///sentinel",
     "https://localhost/sentinel",
     "prisma://localhost/sentinel?api_key=secret",
+    "secret://localhost/sentinel",
     "$DATABASE_URL",
     "postgresql://localhost/sentinel#secret",
+    "postgresql://user:sec#ret@localhost/sentinel",
   ])("rejects malformed connection strings (%j) with a credential-free error", (value) => {
     let error: unknown;
     try {
@@ -42,5 +45,30 @@ describe("Prisma database URL configuration", () => {
     expect(message).toContain("postgresql:// or postgres://");
     expect(message).not.toContain(value);
     expect(message).not.toContain("secret");
+  });
+
+  it.each([
+    ['DATABASE_URL="postgresql://user:secret@localhost/sentinel"', /environment assignment/],
+    ["DIRECT_URL=postgresql://user:secret@localhost/sentinel", /environment assignment/],
+    ["export DATABASE_URL=postgresql://user:secret@localhost/sentinel", /environment assignment/],
+    ['"postgresql://user:secret@localhost/sentinel"', /quote character/],
+    ["psql 'postgresql://user:secret@localhost/sentinel'", /psql command/],
+    ["https://user:secret@localhost/sentinel", /URL scheme is not postgresql or postgres/],
+    ["postgresql://localhost/", /database name is missing/],
+    ["postgresql://user:secret@localhost/sentinel#fragment", /unencoded #/],
+    ["postgresql://user:sec#ret@localhost/sentinel", /unencoded #/],
+    ["postgresql://localhost/sentinel#", /unencoded #/],
+  ])("explains why %j is rejected without echoing it", (value, reason) => {
+    let error: unknown;
+    try {
+      parsePostgresUrl(value, "DATABASE_URL");
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(reason);
+    expect((error as Error).message).not.toContain(value);
+    expect((error as Error).message).not.toContain("secret");
   });
 });

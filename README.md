@@ -108,7 +108,9 @@ Other branches may still use Vercel preview deployments through the Git integrat
    - `VERCEL_ORG_ID`
    - `VERCEL_PROJECT_ID`
 
-After `vercel link`, both IDs are available in `.vercel/project.json`.
+In Vercel's project settings, copy the **Project ID** into `VERCEL_PROJECT_ID`. In the owning team's
+settings, copy the **Team ID** into `VERCEL_ORG_ID`. Vercel CLI 65 does not create the legacy
+`.vercel/project.json` file when linking a project.
 
 Create `VERCEL_TOKEN` in [Vercel account settings → Tokens](https://vercel.com/account/settings/tokens),
 then save its value as a GitHub Actions secret named exactly `VERCEL_TOKEN` in
@@ -123,11 +125,29 @@ secret, then rerun the failed deploy job.
 
 Set `DATABASE_URL` and `DIRECT_URL` in Vercel's **Production** environment to the raw Neon connection
 URLs. Each value must start with `postgresql://` or `postgres://`; do not paste the `psql` command,
-literal surrounding quotes, or a variable such as `$DATABASE_URL`. Credentials containing special
-characters must use URL percent encoding. `DIRECT_URL` must use the direct endpoint without
-`-pooler.` in its hostname. The migration step validates both URLs and passes the pulled Vercel values
-directly to Prisma, overriding any inherited database variables. A `P1013` error indicates an invalid
-connection string; correct the named Vercel environment variable and rerun the deploy job.
+literal surrounding quotes, a `DATABASE_URL=...` assignment, or a variable such as `$DATABASE_URL`.
+Credentials containing special characters must use URL percent encoding. `DIRECT_URL` must use the
+direct endpoint without `-pooler.` in its hostname. The migration step validates both URLs and passes
+the pulled Vercel values directly to Prisma, overriding any inherited database variables. A `P1013`
+error indicates an invalid connection string; correct the named Vercel environment variable and rerun
+the deploy job.
+
+The values should have these shapes, using your actual role, encoded password, host, and database:
+
+| Vercel variable | Value                                                                                                 |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`  | `postgresql://ROLE:ENCODED_PASSWORD@ep-example-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require` |
+| `DIRECT_URL`    | `postgresql://ROLE:ENCODED_PASSWORD@ep-example.us-east-2.aws.neon.tech/neondb?sslmode=require`        |
+
+The `/neondb` path (or your actual database name) is required even when query parameters such as
+`sslmode=require` are present. Percent-encode special characters in the username and password only,
+for example `#` as `%23` and `@` as `%40`. The value field contains only the URL.
+
+If CI reports `DATABASE_URL must be a raw PostgreSQL connection URL`, validation stopped the job
+before Prisma ran. The `Detected:` reason identifies the format problem without printing credentials.
+Correct the value in Vercel's **Production** environment, then rerun the failed deploy job so
+`vercel pull` fetches it again. The migration step gets its values from Vercel; editing a local `.env`
+file or a GitHub `DATABASE_URL` secret does not update this configuration.
 
 ### Web Analytics
 
