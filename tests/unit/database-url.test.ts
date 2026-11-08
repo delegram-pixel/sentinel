@@ -28,6 +28,7 @@ describe("Prisma database URL configuration", () => {
     "https://localhost/sentinel",
     "prisma://localhost/sentinel?api_key=secret",
     "secret://localhost/sentinel",
+    "[SENSITIVE]",
     "$DATABASE_URL",
     "postgresql://localhost/sentinel#secret",
     "postgresql://user:sec#ret@localhost/sentinel",
@@ -48,6 +49,7 @@ describe("Prisma database URL configuration", () => {
   });
 
   it.each([
+    ["[SENSITIVE]", /redacted Vercel Secret placeholder/],
     ['DATABASE_URL="postgresql://user:secret@localhost/sentinel"', /environment assignment/],
     ["DIRECT_URL=postgresql://user:secret@localhost/sentinel", /environment assignment/],
     ["export DATABASE_URL=postgresql://user:secret@localhost/sentinel", /environment assignment/],

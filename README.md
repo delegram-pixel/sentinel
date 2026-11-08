@@ -89,9 +89,9 @@ for the browser suite's production build. The default application build remains 
 
 Production deploys run through GitHub Actions after the `quality`, `integration`, and `e2e` jobs
 pass on `main`. The deploy job pulls the Vercel production environment, applies `yarn db:deploy`
-against the production Neon database, builds a prebuilt Vercel output, and deploys it. A failed
-migration stops the deployment before any new application version is released. The workflow can also
-be started manually with **Actions → CI → Run workflow** on `main`.
+using the GitHub `DIRECT_URL` secret for the production Neon database, builds a prebuilt Vercel
+output, and deploys it. A failed migration stops the deployment before any new application version
+is released. The workflow can also be started manually with **Actions → CI → Run workflow** on `main`.
 
 `vercel.json` disables Git-triggered deployments for `main` so production is owned by the workflow.
 Other branches may still use Vercel preview deployments through the Git integration.
@@ -107,6 +107,7 @@ Other branches may still use Vercel preview deployments through the Git integrat
    - `VERCEL_TOKEN`
    - `VERCEL_ORG_ID`
    - `VERCEL_PROJECT_ID`
+   - `DIRECT_URL`: the raw direct Neon URL for the same production database used by Vercel.
 
 In Vercel's project settings, copy the **Project ID** into `VERCEL_PROJECT_ID`. In the owning team's
 settings, copy the **Team ID** into `VERCEL_ORG_ID`. Vercel CLI 65 does not create the legacy
@@ -115,11 +116,11 @@ settings, copy the **Team ID** into `VERCEL_ORG_ID`. Vercel CLI 65 does not crea
 Create `VERCEL_TOKEN` in [Vercel account settings → Tokens](https://vercel.com/account/settings/tokens),
 then save its value as a GitHub Actions secret named exactly `VERCEL_TOKEN` in
 [repository settings → Secrets and variables → Actions](https://github.com/delegram-pixel/sentinel/settings/secrets/actions).
-You can also store the three deployment secrets in the GitHub `production` environment. Organization
+You can also store these deployment secrets in the GitHub `production` environment. Organization
 secrets must grant this repository access. Setting a token only in Vercel's project environment does
 not make it available to GitHub Actions.
 
-The deploy job checks all three credentials before running its other steps. If `vercel pull` reports
+The deploy job checks all four secrets before running its other steps. If `vercel pull` reports
 that `--token` is missing a value, `VERCEL_TOKEN` was empty in the workflow. Add or correct the GitHub
 secret, then rerun the failed deploy job.
 
@@ -127,10 +128,13 @@ Set `DATABASE_URL` and `DIRECT_URL` in Vercel's **Production** environment to th
 URLs. Each value must start with `postgresql://` or `postgres://`; do not paste the `psql` command,
 literal surrounding quotes, a `DATABASE_URL=...` assignment, or a variable such as `$DATABASE_URL`.
 Credentials containing special characters must use URL percent encoding. `DIRECT_URL` must use the
-direct endpoint without `-pooler.` in its hostname. The migration step validates both URLs and passes
-the pulled Vercel values directly to Prisma, overriding any inherited database variables. A `P1013`
-error indicates an invalid connection string; correct the named Vercel environment variable and rerun
-the deploy job.
+direct endpoint without `-pooler.` in its hostname.
+
+Vercel CLI 65 exports Secret values as `[SENSITIVE]`. Keep the database variables as Secrets in
+Vercel, and separately add the actual raw direct URL as the GitHub Actions `DIRECT_URL` secret in
+the `production` environment. The migration step validates this GitHub value and sets both database
+variables to it only for the Prisma subprocess. It does not read credentials from the pulled Vercel
+file. The application continues to use Vercel's pooled `DATABASE_URL` at runtime.
 
 The values should have these shapes, using your actual role, encoded password, host, and database:
 
@@ -143,11 +147,14 @@ The `/neondb` path (or your actual database name) is required even when query pa
 `sslmode=require` are present. Percent-encode special characters in the username and password only,
 for example `#` as `%23` and `@` as `%40`. The value field contains only the URL.
 
-If CI reports `DATABASE_URL must be a raw PostgreSQL connection URL`, validation stopped the job
-before Prisma ran. The `Detected:` reason identifies the format problem without printing credentials.
-Correct the value in Vercel's **Production** environment, then rerun the failed deploy job so
-`vercel pull` fetches it again. The migration step gets its values from Vercel; editing a local `.env`
-file or a GitHub `DATABASE_URL` secret does not update this configuration.
+If CI reports `DIRECT_URL must be a raw PostgreSQL connection URL`, validation stopped the job before
+Prisma ran. The `Detected:` reason identifies the format problem without printing credentials.
+Correct the GitHub `production` environment's `DIRECT_URL` secret, then rerun the failed deploy job.
+A `P1013` error also indicates an invalid connection string. Editing a local `.env` file or only
+Vercel's environment variables does not update the GitHub migration secret.
+
+After changing this workflow, push to `main` and use the new CI run. Rerunning an older run uses its
+original commit, so it can still try to parse Vercel's redacted database values.
 
 ### Web Analytics
 

@@ -14,6 +14,10 @@ export function parsePostgresUrl(value, variableName) {
       `${variableName} must be a raw PostgreSQL connection URL starting with postgresql:// or postgres:// and containing a host and database name. Do not include a psql command or literal surrounding quotes; percent-encode special characters in credentials.${reason ? ` Detected: ${reason}.` : ""}`,
     );
 
+  if (normalized === "[SENSITIVE]") {
+    throw invalidUrl("the value is a redacted Vercel Secret placeholder");
+  }
+
   if (/^(?:export\s+)?[a-zA-Z_][a-zA-Z0-9_]*\s*=/.test(normalized)) {
     throw invalidUrl(
       "the value is an environment assignment; paste only the URL after =, without wrapping quotes",

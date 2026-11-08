@@ -138,10 +138,12 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - name: Validate deployment secrets
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
         shell: bash
         run: |
           deployment_secrets_missing=0
-          for deployment_secret_name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+          for deployment_secret_name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID DIRECT_URL; do
             deployment_secret_value="${!deployment_secret_name:-}"
             if [[ -z "${deployment_secret_value//[[:space:]]/}" ]]; then
               echo "::error::${deployment_secret_name} is missing or blank. Add it in GitHub Settings > Secrets and variables > Actions, or in the production environment secrets."
@@ -165,39 +167,29 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
-      # Pull the production environment from Vercel so migrations and the build
-      # use the same Neon connection strings that the deployment will use.
+      # Pull project settings and build variables. Vercel Secret values are
+      # redacted in this export, so migrations use the GitHub DIRECT_URL secret.
       - name: Pull Vercel production environment
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
 
       - name: Apply production database migrations
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: |
           node --input-type=module <<'NODE'
-          import { readFileSync } from "node:fs";
           import { spawnSync } from "node:child_process";
-          import { parse } from "dotenv";
-          import { parsePostgresUrl } from "./scripts/database-url.mjs";
+          import { createProductionMigrationEnv } from "./scripts/production-migration-env.mjs";
 
           try {
-            const env = parse(readFileSync(".vercel/.env.production.local"));
-            const databaseUrl = parsePostgresUrl(env.DATABASE_URL, "DATABASE_URL");
-            const directUrl = parsePostgresUrl(env.DIRECT_URL, "DIRECT_URL");
-            if (!databaseUrl || !directUrl) {
-              throw new Error(`${!databaseUrl ? "DATABASE_URL" : "DIRECT_URL"} is not set in the Vercel Production environment.`);
-            }
-            if (new URL(directUrl).hostname.includes("-pooler.")) {
-              throw new Error("DIRECT_URL must use the direct Neon connection, not the pooler.");
-            }
-
             const result = spawnSync("yarn", ["db:deploy"], {
               stdio: "inherit",
-              env: { ...process.env, ...env, DATABASE_URL: databaseUrl, DIRECT_URL: directUrl },
+              env: createProductionMigrationEnv(process.env),
             });
             if (result.error) throw result.error;
             process.exitCode = result.status ?? 1;
           } catch (error) {
             console.error(`::error::${error.message}`);
-            console.error("Database URLs are loaded from Vercel Project Settings > Environment Variables (Production). Correct the named setting there and rerun the deploy job.");
+            console.error("Migration DIRECT_URL is loaded from GitHub Actions secrets in the production environment. Set it to the raw direct Neon URL for the production database, then rerun the deploy job.");
             process.exitCode = 1;
           }
           NODE
