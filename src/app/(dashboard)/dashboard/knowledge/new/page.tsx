@@ -13,7 +13,7 @@ export default function NewKnowledgePage() {
     <div className="page-stack">
       <PageHeader
         title="Add research knowledge"
-        description="Preserve supplied material and its provenance. A human review is required before it contributes to AI context."
+        description="Found something worth keeping? Add the content and where it came from. Save it as a draft; a human reviewer must approve it before AI can use it as context."
       />
       <Suspense fallback={<p>Loading engagements…</p>}>
         <Content />

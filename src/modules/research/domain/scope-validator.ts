@@ -1,4 +1,5 @@
 import {
+  CAPABILITY_LABELS,
   evaluateCapability,
   type Capability,
   type CapabilityActor,
@@ -202,27 +203,36 @@ export function validateScopeCapability(
   if (!scope) {
     return failure(
       "SCOPE_NOT_CONFIGURED",
-      "No scope version exists for this target. Create and activate one first.",
+      "This target needs a scope first. Draft its boundaries and activate the scope with your permission attestation before continuing.",
     );
   }
 
   if (scope.status !== "ACTIVE") {
     return failure(
       "SCOPE_NOT_ACTIVE",
-      `The scope is ${scope.status.toLowerCase()}; no activity is authorized.`,
+      `This scope is ${scope.status.toLowerCase()}, so it doesn't permit the action. Check the target's scope history before continuing.`,
     );
   }
 
   if (!scope.effectiveFrom || !scope.effectiveUntil) {
-    return failure("SCOPE_INCOMPLETE", "The active scope is missing its effective window.");
+    return failure(
+      "SCOPE_INCOMPLETE",
+      "This scope is missing its permission dates. Create and activate a scope version with valid dates before continuing.",
+    );
   }
 
   if (now.getTime() < scope.effectiveFrom.getTime()) {
-    return failure("SCOPE_NOT_YET_EFFECTIVE", "The active scope has not started yet.");
+    return failure(
+      "SCOPE_NOT_YET_EFFECTIVE",
+      "This scope's permission window hasn't started yet. Wait until its start time before using it.",
+    );
   }
 
   if (now.getTime() > scope.effectiveUntil.getTime()) {
-    return failure("SCOPE_EXPIRED", "The active scope has expired.");
+    return failure(
+      "SCOPE_EXPIRED",
+      "This scope's permission window has ended. Further work needs a new active scope with current permission.",
+    );
   }
 
   const activity = scope.activities.find((rule) => rule.activity === capability);
@@ -230,14 +240,14 @@ export function validateScopeCapability(
   if (!activity) {
     return failure(
       "CAPABILITY_NOT_PERMITTED",
-      `${capability} is not listed as a permitted activity in the active scope.`,
+      `This scope doesn't permit ${CAPABILITY_LABELS[capability]}. Check the activities covered by your permission before continuing.`,
     );
   }
 
   if (activity.effect === ("PROHIBITED" satisfies ScopeActivityEffect)) {
     return failure(
       "CAPABILITY_PROHIBITED",
-      `${capability} is explicitly prohibited by the active scope.`,
+      `This scope explicitly prohibits ${CAPABILITY_LABELS[capability]}. Check the permission boundaries before continuing.`,
     );
   }
 
@@ -246,7 +256,10 @@ export function validateScopeCapability(
   );
 
   if (matchingAssets.some((asset) => asset.effect === ("EXCLUDED" satisfies ScopeAssetEffect))) {
-    return failure("ASSET_EXCLUDED", "The target asset is explicitly excluded from the scope.");
+    return failure(
+      "ASSET_EXCLUDED",
+      "This asset is explicitly excluded, so this scope doesn't permit the action. Check the permission boundaries before continuing.",
+    );
   }
 
   if (matchingAssets.some((asset) => asset.effect === "ALLOWED")) {
@@ -256,5 +269,8 @@ export function validateScopeCapability(
     };
   }
 
-  return failure("ASSET_NOT_IN_SCOPE", "The target asset is not listed in the active scope.");
+  return failure(
+    "ASSET_NOT_IN_SCOPE",
+    "This asset isn't covered by the active scope. Check your permission and the scope's asset rules before continuing.",
+  );
 }

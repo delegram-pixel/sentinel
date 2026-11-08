@@ -24,21 +24,36 @@ export const AI_ERROR_CODES = [
 export type AiErrorCode = (typeof AI_ERROR_CODES)[number];
 
 export const AI_ERROR_MESSAGES: Record<AiErrorCode, string> = {
-  AI_NOT_CONFIGURED: "The AI provider is not configured on this deployment.",
-  AI_PROVIDER_ERROR: "The AI provider could not complete the request.",
-  AI_RATE_LIMITED: "The AI provider is rate limiting requests. Try again later.",
-  AI_TIMEOUT: "The AI request exceeded its time limit.",
-  AI_BUDGET_EXCEEDED: "The AI usage budget is exhausted for today.",
-  AI_INVALID_OUTPUT: "The AI response was not valid structured output.",
-  AI_OUTPUT_VALIDATION_FAILED: "The AI response did not pass validation.",
-  AI_REFUSAL: "The AI provider refused to answer this request.",
-  AI_CONTEXT_UNAVAILABLE: "The investigation context could not be assembled.",
-  AI_CONTEXT_TOO_LARGE: "The investigation context exceeds the task input budget.",
-  AI_TASK_NOT_FOUND: "That AI task does not exist in this workspace.",
-  AI_TASK_NOT_SUPPORTED: "That AI task is not available in this release.",
-  AI_CONVERSATION_NOT_FOUND: "That AI conversation does not exist in this workspace.",
-  AI_INVESTIGATION_NOT_FOUND: "That investigation does not exist in this workspace.",
-  AI_PERMISSION_DENIED: "The AI task is not permitted for this investigation.",
+  AI_NOT_CONFIGURED:
+    "AI isn't set up here yet. Ask the person managing this deployment to configure the provider.",
+  AI_PROVIDER_ERROR:
+    "The AI provider couldn't finish this request. Check task history before trying again.",
+  AI_RATE_LIMITED:
+    "The AI provider is receiving too many requests. Give it a moment, then try again.",
+  AI_TIMEOUT:
+    "This AI request ran out of time. Check task history for its status before trying again.",
+  AI_BUDGET_EXCEEDED:
+    "You've reached today's AI usage budget. You can continue recording research and return to AI when the budget resets.",
+  AI_INVALID_OUTPUT:
+    "The AI reply wasn't in the format this task needs. Check task history before trying another request.",
+  AI_OUTPUT_VALIDATION_FAILED:
+    "The AI reply didn't pass the result checks. Review the task details before using it or trying again.",
+  AI_REFUSAL:
+    "The AI provider declined this request. Review the question and supplied context before deciding what to ask next.",
+  AI_CONTEXT_UNAVAILABLE:
+    "We couldn't prepare this investigation's saved context. Reopen the investigation and check its records before trying again.",
+  AI_CONTEXT_TOO_LARGE:
+    "This investigation has more context than the task's input budget allows. Review the saved material before trying again.",
+  AI_TASK_NOT_FOUND:
+    "We can't find that AI task in this workspace. Open the investigation's task history to choose an available one.",
+  AI_TASK_NOT_SUPPORTED:
+    "This AI task isn't available in this version. Choose one of the supported analyses.",
+  AI_CONVERSATION_NOT_FOUND:
+    "We can't find that conversation in this workspace. Open Research assistance to choose an available conversation.",
+  AI_INVESTIGATION_NOT_FOUND:
+    "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
+  AI_PERMISSION_DENIED:
+    "This investigation doesn't permit the requested AI task. Check its project, target, and permission details before continuing.",
 };
 
 export class AiError extends Error {

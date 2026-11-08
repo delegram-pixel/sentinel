@@ -144,9 +144,8 @@ export function InvestigationForm(props: InvestigationFormProps) {
         description={
           <>
             {" "}
-            Name the investigation and record what you are trying to establish. Investigations can
-            be created before a scope is active, but every target action still requires an active
-            scope.{" "}
+            Give the question a name and explain what you want to find out. You can save notes
+            before scope activation; actions on the target still need an active scope.{" "}
           </>
         }
       >
@@ -257,10 +256,10 @@ export function InvestigationForm(props: InvestigationFormProps) {
               htmlFor="investigation-objective"
               help={{
                 description:
-                  "State one question the investigation should answer and what evidence would resolve it. A focused objective improves research decisions and AI context.",
+                  "Write one question and describe what evidence would answer it. A focused objective helps you and the AI stay on track.",
                 example:
-                  "Determine whether the supplied response exposes another account's data, and identify the evidence needed to rule out expected behavior.",
-                note: "Describe the research question here; record confirmed impact only after verification.",
+                  "Does this saved response expose another account's data? What evidence would show whether that's expected behaviour?",
+                note: "Start with the question. Save confirmed impact for after verification.",
               }}
             >
               Research objective

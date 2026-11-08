@@ -66,7 +66,7 @@ export async function createReportTemplateAction(
   if (!parsed.success) {
     return {
       status: "error",
-      message: "Check the template details and try again.",
+      message: "Check the template name and sections, then try saving again.",
       fieldErrors: toFieldErrors(parsed.error.issues),
       values,
     };

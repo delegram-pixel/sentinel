@@ -61,7 +61,9 @@ export function ResearchWorkbench({
             <SheetContent closeLabel="Close assistance">
               <SheetHeader>
                 <SheetTitle>Research assistance</SheetTitle>
-                <SheetDescription>Investigation context and session continuity.</SheetDescription>
+                <SheetDescription>
+                  Review the saved context and find your next step for this investigation.
+                </SheetDescription>
               </SheetHeader>
               <div className="px-6 py-6">{assistant}</div>
             </SheetContent>

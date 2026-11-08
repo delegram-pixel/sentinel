@@ -10,7 +10,8 @@ export default function SettingsError({ retry }: { retry: () => void }) {
       <PageHeader title="Settings could not be loaded" />
       <Alert variant="destructive">
         <AlertDescription>
-          Your account and workspace details are temporarily unavailable. Try again in a moment.
+          We couldn&apos;t load your account and workspace details. Give it a moment, then try
+          again.
         </AlertDescription>
       </Alert>
       <Button onClick={() => retry()} className="self-start">

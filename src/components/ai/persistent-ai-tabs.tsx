@@ -34,7 +34,9 @@ export function PersistentAiTabs({
           }
           router.refresh();
         } catch {
-          setError("The session mode could not be saved. Refresh before retrying.");
+          setError(
+            "We couldn't save the session mode. Refresh the page, then try switching modes again.",
+          );
           setSelected(mode.toLowerCase());
         }
       });

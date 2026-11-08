@@ -36,14 +36,20 @@ export async function createScopeDraft(
   const target = await targetStore.findTargetLookup(actor.workspaceId, targetId);
 
   if (!target) {
-    return failure("TARGET_NOT_FOUND", "That target does not exist in this workspace.");
+    return failure(
+      "TARGET_NOT_FOUND",
+      "We can't find that target in this workspace. Open Targets to choose an available one.",
+    );
   }
 
   const effectiveFromDate = parseDateOnly(parsed.data.effectiveFrom);
   const effectiveUntilDate = parseDateOnly(parsed.data.effectiveUntil);
 
   if (!effectiveFromDate || !effectiveUntilDate) {
-    return failure("VALIDATION_FAILED", "Enter a valid effective window.");
+    return failure(
+      "VALIDATION_FAILED",
+      "Check the scope's start and end dates. Both need to be valid dates.",
+    );
   }
 
   const effectiveFrom = startOfDayUtc(effectiveFromDate);
@@ -94,7 +100,10 @@ export async function activateScope(
   const found = await scopeStore.findScope(actor.workspaceId, scopeId);
 
   if (!found) {
-    return failure("SCOPE_NOT_FOUND", "That scope version does not exist in this workspace.");
+    return failure(
+      "SCOPE_NOT_FOUND",
+      "We can't find that scope version in this workspace. Open the target's scope history to choose an available version.",
+    );
   }
 
   const activation = validateScopeActivation(found.scope, parsed.data, now);
@@ -148,11 +157,17 @@ export async function revokeScope(
   const found = await scopeStore.findScope(actor.workspaceId, scopeId);
 
   if (!found) {
-    return failure("SCOPE_NOT_FOUND", "That scope version does not exist in this workspace.");
+    return failure(
+      "SCOPE_NOT_FOUND",
+      "We can't find that scope version in this workspace. Open the target's scope history to choose an available version.",
+    );
   }
 
   if (found.scope.status !== "ACTIVE") {
-    return failure("SCOPE_NOT_ACTIVE", "Only the active scope version can be revoked.");
+    return failure(
+      "SCOPE_NOT_ACTIVE",
+      "Revocation applies to the active scope version. Check the target's scope history for the current one.",
+    );
   }
 
   const revoked = await scopeStore.revokeScope(actor.workspaceId, scopeId, now, {
@@ -165,7 +180,10 @@ export async function revokeScope(
   });
 
   if (!revoked) {
-    return failure("SCOPE_NOT_FOUND", "That scope version does not exist in this workspace.");
+    return failure(
+      "SCOPE_NOT_FOUND",
+      "We can't find that scope version in this workspace. Open the target's scope history to choose an available version.",
+    );
   }
 
   return { ok: true, value: { id: revoked.id } };
@@ -187,7 +205,10 @@ export async function validateTargetCapability(
   const target = await targetStore.findTargetLookup(actor.workspaceId, targetId);
 
   if (!target) {
-    return failure("TARGET_NOT_FOUND", "That target does not exist in this workspace.");
+    return failure(
+      "TARGET_NOT_FOUND",
+      "We can't find that target in this workspace. Open Targets to choose an available one.",
+    );
   }
 
   const activeScope = await scopeStore.findActiveScope(actor.workspaceId, targetId);

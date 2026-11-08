@@ -85,7 +85,11 @@ async function EvidenceDetailContent({ params }: EvidenceDetailPageProps) {
           session.role === "OWNER" || session.role === "ADMIN" || session.role === "REVIEWER"
         }
       />
-      <ResearchSection id="collection-provenance" title="Collection provenance">
+      <ResearchSection
+        id="collection-provenance"
+        title="Collection details"
+        description="Note who collected this evidence, when, and how. These details help a reviewer trace it back to the original observation."
+      >
         <p className="mb-4 text-sm">
           Collector: {evidence.collector ?? "Unknown"} · Collection date:{" "}
           {evidence.collectedAt?.toLocaleDateString() ?? "Unknown"}
@@ -94,7 +98,7 @@ async function EvidenceDetailContent({ params }: EvidenceDetailPageProps) {
           <ResearchActionForm
             action={recordProvenanceAction}
             hidden={{ evidenceId: evidence.id }}
-            submitLabel="Record collection provenance"
+            submitLabel="Save collection details"
             fields={[
               { name: "collector", label: "Collector", required: true, maxLength: 300 },
               { name: "collectedAt", label: "Collection date, if known", type: "date" },
@@ -137,13 +141,18 @@ async function EvidenceDetailContent({ params }: EvidenceDetailPageProps) {
             ]}
           />
           <p className="text-sm text-muted-foreground">
-            Review a fresh upload before linking it to research. Finish its background promotion
-            first; the previous evidence and its existing references are retained.
+            Review the new upload and wait for it to finish moving out of quarantine before
+            recording it as a replacement. The earlier evidence and its existing links stay in the
+            history.
           </p>
         </ResearchSection>
       ) : null}
       {investigation && !evidence.deletedAt ? (
-        <ResearchSection id="evidence-research-relations" title="Research relationships">
+        <ResearchSection
+          id="evidence-research-relations"
+          title="Research relationships"
+          description="Connect this evidence to an observation or hypothesis, and explain whether it supports the idea, challenges it, or adds context."
+        >
           <ResearchActionForm
             action={relateEvidenceResearchAction}
             hidden={{ evidenceId: evidence.id }}
@@ -183,7 +192,11 @@ async function EvidenceDetailContent({ params }: EvidenceDetailPageProps) {
           />
         </ResearchSection>
       ) : null}
-      <ResearchSection id="evidence-assessments" title="Evidence quality assessments">
+      <ResearchSection
+        id="evidence-assessments"
+        title="Evidence quality assessments"
+        description="Use these assessments to check the evidence's strengths and gaps. A human reviewer can record whether the assessment is useful; evidence approval is a separate review."
+      >
         {assessments.length ? (
           assessments.map((a) => (
             <div className="border-b border-border py-4" key={a.id}>
@@ -220,7 +233,10 @@ async function EvidenceDetailContent({ params }: EvidenceDetailPageProps) {
             </div>
           ))
         ) : (
-          <p>No evidence quality assessments recorded.</p>
+          <p>
+            No assessments yet. Queue an Evidence review from Background work to review the eligible
+            evidence in this investigation.
+          </p>
         )}
       </ResearchSection>
     </div>

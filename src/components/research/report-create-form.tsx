@@ -79,10 +79,10 @@ export function ReportCreateForm({
             htmlFor="report-template"
             help={{
               description:
-                "Choose the structure and sections used to build the report draft. The template organizes the material; it does not approve the findings or the resulting report.",
+                "Pick a layout that suits the write-up. It organises the sections; the findings and report still need their own human review.",
               example:
-                "Choose a template suited to the intended audience, then review the selected findings and generated narrative before approval.",
-              note: "Report revisions retain history. Export requires human approval and ready source records.",
+                "Choose a template for your audience, then check the selected findings and write-up before requesting approval.",
+              note: "Each saved revision keeps its history. Export needs human approval and source records that are ready to use.",
             }}
           >
             Report template
@@ -101,8 +101,8 @@ export function ReportCreateForm({
             ))}
           </Select>
           <FieldDescription>
-            Required sections stay in every report. Workspace templates are managed on the report
-            templates page.
+            Every report keeps the required sections. To create or manage workspace layouts, open
+            Report templates.
           </FieldDescription>
           {errorFor(state, "templateId")}
         </Field>
@@ -110,8 +110,9 @@ export function ReportCreateForm({
         <FieldSet>
           <FieldLegend>Findings to include</FieldLegend>
           <FieldDescription>
-            Only confirmed or reportable findings are available. Each finding must have severity,
-            impact, remediation, an affected asset, and approved supporting evidence.
+            Choose from confirmed or reportable findings. Each one needs severity, impact,
+            remediation, an affected asset, and approved supporting evidence before it can be
+            included.
           </FieldDescription>
           <div className="mt-3 flex flex-col gap-2">
             {findings.map((finding) => (

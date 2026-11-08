@@ -10,7 +10,7 @@ export function ClerkSetupNotice() {
     <div className="mx-auto flex min-h-[60dvh] w-full max-w-2xl flex-col justify-center gap-8 px-5 py-12">
       <PageHeader
         title="Authentication is not configured"
-        description="Sign-in is unavailable in this environment. Authentication must be configured before you can open research records."
+        description="Sign-in isn't set up here yet. Configure authentication to open your research workspace."
       />
       <Disclosure title="Local setup details">
         <p className="text-sm leading-relaxed text-text-secondary">

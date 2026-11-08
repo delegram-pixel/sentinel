@@ -26,13 +26,7 @@ export default async function NewScopePage({ params }: NewScopePageProps) {
   return (
     <FormPage
       title="Draft a scope version"
-      description={
-        <>
-          {" "}
-          Record the assets, activities, and effective window for this target. A draft authorizes
-          nothing until it is activated with an attestation.{" "}
-        </>
-      }
+      description="Set the boundaries: which assets and activities are allowed, what's excluded, and when permission applies. Save the draft, then activate it with an attestation before testing."
       backHref={`/dashboard/projects/${projectId}/targets/${targetId}`}
       backLabel="Back to target"
     >

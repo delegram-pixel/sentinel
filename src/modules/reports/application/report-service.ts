@@ -49,11 +49,14 @@ function auditDraft(
 
 function assertReportContextEditable(context: ReportInvestigationContext): DomainResult<true> {
   if (context.projectStatus === "ARCHIVED") {
-    return failure("PROJECT_ARCHIVED", "Reports in an archived project cannot be changed.");
+    return failure("PROJECT_ARCHIVED", "This project is archived, so its reports are read-only.");
   }
 
   if (context.investigationStatus === "ARCHIVED") {
-    return failure("INVESTIGATION_ARCHIVED", "An archived investigation cannot be changed.");
+    return failure(
+      "INVESTIGATION_ARCHIVED",
+      "This investigation is archived. You can revisit its history, but editing is closed.",
+    );
   }
 
   return { ok: true, value: true };
@@ -144,7 +147,7 @@ function readinessFailure(source: ReportSource, report: ReportDetail): DomainRes
   if (source.findings.length !== report.findings.length) {
     return failure(
       "REPORT_FINDING_MISSING",
-      "A finding selected for this report no longer exists in the workspace.",
+      "One of this report's findings is no longer available. Check the selected findings before continuing.",
     );
   }
 
@@ -210,7 +213,7 @@ export async function createReportTemplate(
   if (!canManageReportTemplates(actor.role)) {
     return failure(
       "FORBIDDEN_REPORT_ACTOR",
-      "Only an owner or administrator can manage workspace report templates.",
+      "Ask a workspace owner or administrator to manage report templates.",
     );
   }
 
@@ -248,7 +251,7 @@ export async function setReportTemplateActive(
   if (!canManageReportTemplates(actor.role)) {
     return failure(
       "FORBIDDEN_REPORT_ACTOR",
-      "Only an owner or administrator can manage workspace report templates.",
+      "Ask a workspace owner or administrator to manage report templates.",
     );
   }
 
@@ -264,7 +267,7 @@ export async function setReportTemplateActive(
   if (!updated) {
     return failure(
       "REPORT_TEMPLATE_NOT_FOUND",
-      "That workspace template does not exist or is a system template.",
+      "This template is unavailable or is a built-in layout. Choose a workspace template to manage.",
     );
   }
 
@@ -295,7 +298,7 @@ export async function createReport(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -313,7 +316,7 @@ export async function createReport(
     if (!template || !template.isActive) {
       return failure(
         "REPORT_TEMPLATE_NOT_FOUND",
-        "The selected report template is not available in this workspace.",
+        "This template isn't available in your workspace. Choose an available template and try again.",
       );
     }
   }
@@ -329,7 +332,7 @@ export async function createReport(
   if (selected.length !== findingIds.length) {
     return failure(
       "REPORT_FINDING_NOT_ELIGIBLE",
-      "Only confirmed or reportable findings can be included in a report.",
+      "Choose findings a human reviewer has confirmed or marked reportable. Other findings need verification first.",
     );
   }
 
@@ -394,7 +397,10 @@ export async function saveReportRevision(
   const report = await store.findReport(actor.workspaceId, reportId);
 
   if (!report) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   if (report.status !== "DRAFT") {
@@ -406,7 +412,7 @@ export async function saveReportRevision(
   if (!built) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "The investigation for this report does not exist in this workspace.",
+      "We can't find this report's investigation in the workspace. Reopen the report to check its research context.",
     );
   }
 
@@ -419,7 +425,7 @@ export async function saveReportRevision(
   if (built.source.findings.length !== report.findings.length) {
     return failure(
       "REPORT_FINDING_MISSING",
-      "A finding selected for this report no longer exists in the workspace.",
+      "One of this report's findings is no longer available. Check the selected findings before continuing.",
     );
   }
 
@@ -446,7 +452,10 @@ export async function saveReportRevision(
   );
 
   if (!saved) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: saved.id } };
@@ -461,11 +470,17 @@ export async function submitReport(
   const report = await store.findReport(actor.workspaceId, reportId);
 
   if (!report) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   if (!canTransitionReport(report.status, "UNDER_REVIEW")) {
-    return failure("REPORT_STATUS_INVALID", "Only a draft report can be submitted for review.");
+    return failure(
+      "REPORT_STATUS_INVALID",
+      "Send reports for review from Draft. Check the report's current status before continuing.",
+    );
   }
 
   const built = await buildSource(store, actor.workspaceId, report, now);
@@ -473,7 +488,7 @@ export async function submitReport(
   if (!built) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "The investigation for this report does not exist in this workspace.",
+      "We can't find this report's investigation in the workspace. Reopen the report to check its research context.",
     );
   }
 
@@ -490,7 +505,10 @@ export async function submitReport(
   }
 
   if (report.latestRevisionVersion < 1) {
-    return failure("REPORT_REVISION_MISSING", "Save a report revision before submitting it.");
+    return failure(
+      "REPORT_REVISION_MISSING",
+      "Save a revision first, then send the report for review.",
+    );
   }
 
   const updated = await store.transitionReport(
@@ -508,7 +526,10 @@ export async function submitReport(
   );
 
   if (!updated) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };
@@ -521,17 +542,26 @@ export async function approveReport(
   now: Date = new Date(),
 ): Promise<DomainResult<{ id: string }>> {
   if (!isHumanReviewer(actor.role)) {
-    return failure("FORBIDDEN_REPORT_ACTOR", "A human reviewer must approve a report.");
+    return failure(
+      "FORBIDDEN_REPORT_ACTOR",
+      "Ask a human reviewer to check and approve this report.",
+    );
   }
 
   const report = await store.findReport(actor.workspaceId, reportId);
 
   if (!report) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   if (!canTransitionReport(report.status, "APPROVED")) {
-    return failure("REPORT_STATUS_INVALID", "Only a report under review can be approved.");
+    return failure(
+      "REPORT_STATUS_INVALID",
+      "Send the report for review before asking a human reviewer to approve it.",
+    );
   }
 
   const built = await buildSource(store, actor.workspaceId, report, now);
@@ -539,7 +569,7 @@ export async function approveReport(
   if (!built) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "The investigation for this report does not exist in this workspace.",
+      "We can't find this report's investigation in the workspace. Reopen the report to check its research context.",
     );
   }
 
@@ -572,7 +602,10 @@ export async function approveReport(
   );
 
   if (!updated) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };
@@ -586,11 +619,17 @@ export async function reopenReport(
   const report = await store.findReport(actor.workspaceId, reportId);
 
   if (!report) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   if (!canTransitionReport(report.status, "DRAFT")) {
-    return failure("REPORT_STATUS_INVALID", "Only a report under review can be returned to draft.");
+    return failure(
+      "REPORT_STATUS_INVALID",
+      "You can return a report to Draft while it's Under review. Check its current status first.",
+    );
   }
 
   const updated = await store.transitionReport(
@@ -608,7 +647,10 @@ export async function reopenReport(
   );
 
   if (!updated) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };
@@ -623,7 +665,10 @@ export async function archiveReport(
   const report = await store.findReport(actor.workspaceId, reportId);
 
   if (!report) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   if (!canTransitionReport(report.status, "ARCHIVED")) {
@@ -646,7 +691,10 @@ export async function archiveReport(
   );
 
   if (!updated) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };
@@ -670,7 +718,7 @@ async function buildReportExport(
   const revision = report.revisions[0];
 
   if (!revision) {
-    throw new Error("This report has no saved revision to export.");
+    throw new Error("Save a revision and get it approved before exporting this report.");
   }
 
   return {
@@ -691,15 +739,21 @@ export async function exportReport(
   const report = await store.findReport(actor.workspaceId, reportId);
 
   if (!report) {
-    return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+    return failure(
+      "REPORT_NOT_FOUND",
+      "We can't find that report in this workspace. Open Reports to choose an available one.",
+    );
   }
 
   if (report.status !== "APPROVED" && report.status !== "EXPORTED") {
-    return failure("REPORT_NOT_APPROVED", "Only an approved report can be exported.");
+    return failure("REPORT_NOT_APPROVED", "Get human approval for the report before exporting it.");
   }
 
   if (report.revisions.length === 0) {
-    return failure("REPORT_REVISION_MISSING", "This report has no saved revision to export.");
+    return failure(
+      "REPORT_REVISION_MISSING",
+      "Save a revision and get it approved before exporting this report.",
+    );
   }
 
   const result = await buildReportExport(report, format);
@@ -726,7 +780,10 @@ export async function exportReport(
     );
 
     if (!updated) {
-      return failure("REPORT_NOT_FOUND", "That report does not exist in this workspace.");
+      return failure(
+        "REPORT_NOT_FOUND",
+        "We can't find that report in this workspace. Open Reports to choose an available one.",
+      );
     }
   }
 

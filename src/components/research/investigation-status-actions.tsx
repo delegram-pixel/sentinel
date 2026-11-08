@@ -45,7 +45,7 @@ export function InvestigationStatusForm({
   if (!nextStatuses.length)
     return (
       <p className="text-sm text-text-secondary">
-        This investigation is archived. Its history remains available.
+        This investigation is archived. You can still revisit its history.
       </p>
     );
   return (

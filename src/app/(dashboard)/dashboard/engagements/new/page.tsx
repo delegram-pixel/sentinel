@@ -13,7 +13,7 @@ export default function NewEngagementPage() {
     <div className="page-stack">
       <PageHeader
         title="New engagement"
-        description="Define the research objective. Associate assets and existing scope versions after creation."
+        description="Choose a project and describe what this round of research should achieve. Once it's created, you can connect targets and their existing scope versions."
       />
       <Suspense fallback={<p>Loading projects…</p>}>
         <Content />

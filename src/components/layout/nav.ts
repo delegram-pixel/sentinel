@@ -20,9 +20,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         exact: true,
         help: {
           description:
-            "Your workspace overview brings together recent research and links to the records that need attention.",
+            "Start here to see what's been happening and what needs your attention. Pick up a recent investigation or follow a finding back to its evidence.",
           example:
-            "Start a project, return to a recent investigation, or follow a finding into its supporting evidence.",
+            "Returning after a break? Open a recent investigation and check its saved next actions.",
         },
       },
       {
@@ -30,9 +30,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/insights",
         help: {
           description:
-            "Review recorded research activity and outcomes across the workspace to understand progress and recurring patterns.",
-          example: "Look at open findings and remediation outcomes when planning the next review.",
-          note: "Insights reflect saved records; they do not independently verify a vulnerability.",
+            "See how your saved research is progressing. Use the counts to spot reviews waiting on you and fixes that still need a follow-up.",
+          example: "Check the finding and remediation counts before deciding what to review next.",
+          note: "These counts come from saved records. You'll still need to review the evidence to verify a vulnerability.",
         },
       },
       {
@@ -40,10 +40,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/projects",
         help: {
           description:
-            "A project groups related targets, investigations, and engagements. Create it before adding the assets you intend to research.",
+            "Give related research a home. Create a project first, then add its targets, investigations, and engagements as the work takes shape.",
           example:
-            "Use a Learning lab project for a practice application, with one target and separate investigations for different questions.",
-          note: "Project type describes the work. Authorization comes from an active scope on each target.",
+            "For a practice app, create a Learning lab project, add one target, and open a separate investigation for each question.",
+          note: "The project type explains the setting. Each target still needs its own active scope before testing.",
         },
       },
       {
@@ -51,9 +51,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/investigations",
         help: {
           description:
-            "Keep a research question, observations, hypotheses, decisions, evidence, and AI conversations together in an attributable working record.",
+            "Follow one research question here. Keep the clues, ideas, decisions, evidence, and AI conversations together so you can explain how you reached a conclusion.",
           example:
-            "Investigate whether a supplied response reveals another user's data; record both supporting and contradictory observations.",
+            "If a saved response seems to expose another account's data, record what supports that idea and what might rule it out.",
         },
       },
       {
@@ -61,10 +61,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/engagements",
         help: {
           description:
-            "Group related research within a project around a defined objective. Associate existing targets and scope versions and track the engagement's progress.",
+            "Plan a round of work within a project. Write its objective, connect existing targets and scope versions, then update progress as you go.",
           example:
-            "Create an engagement for a quarterly application review with its relevant targets and research objectives.",
-          note: "An engagement association or status never replaces target scope authorization.",
+            "For a quarterly app review, create an engagement and connect the targets you'll be reviewing.",
+          note: "Connecting a target or marking an engagement active doesn't grant testing permission. Check the target's scope too.",
         },
       },
     ],
@@ -77,10 +77,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/targets",
         help: {
           description:
-            "Register a domain, URL, application, or other asset under a project. Record its environment and permission source, then define an approved scope.",
+            "Record the asset you want to research, its environment, and where your permission comes from. Then define and activate its scope before testing.",
           example:
-            "Add lab.example.test as a domain target and restrict the scope to the permitted assets, activities, and effective dates.",
-          note: "Recording a target alone does not authorize platform activity.",
+            "Add lab.example.test, then set the allowed assets, activities, and dates to match your permission.",
+          note: "Adding a target is the first step. Testing still needs an approved, active scope.",
         },
       },
       {
@@ -88,10 +88,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/knowledge",
         help: {
           description:
-            "Preserve source material and reusable research with provenance and review status. Reviewed documents can inform later investigation context.",
+            "Keep useful references and lessons somewhere you can find them again. Save the source details, then have a human reviewer approve the material before using it in AI context.",
           example:
-            "Save an assessment methodology with its source URL and date, review it, and relate a corrected document to the original.",
-          note: "AI interpretations begin as drafts and need human review before becoming trusted references.",
+            "Save a methodology with its source URL and date. If you later find a correction, connect the new document to the original.",
+          note: "AI interpretations start as drafts. A human reviewer needs to check them before they become trusted references.",
         },
       },
       {
@@ -99,10 +99,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/imports",
         help: {
           description:
-            "Upload supplied JSON, CSV, or SARIF results for review. Inspect the parsed records and their sources before adopting useful observations or finding drafts.",
+            "Already have tool results? Upload a JSON, CSV, or SARIF export, check each record and its source, then adopt useful results as draft observations or findings.",
           example:
-            "Import a SARIF report from a tool you already ran in an authorized environment and review each relevant result.",
-          note: "Importing data does not run a scanner or confirm its claims.",
+            "Upload a SARIF report from a tool you ran with permission, then review the results relevant to your investigation.",
+          note: "An import brings in existing results. You'll still need to verify the tool's claims yourself.",
         },
       },
       {
@@ -110,9 +110,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/remediation",
         help: {
           description:
-            "Record remediation work, follow-up checks, and the outcome of a finding. Keep the retest record connected to the original claim and evidence.",
+            "Keep track of what happened after a finding: the proposed fix, follow-up checks, and final outcome. Connect each retest to the original claim and evidence.",
           example:
-            "Document a proposed fix, record the human retest and supporting material, then update the outcome based on that review.",
+            "Describe the fix, record an authorized manual retest with its evidence, then update the outcome based on what you found.",
         },
       },
       {
@@ -120,10 +120,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/tasks",
         help: {
           description:
-            "Monitor recorded analytical jobs, including queued, running, completed, failed, and cancelled work. Inspect execution history before retrying an unsuccessful job.",
+            "Check whether analysis is queued, running, finished, failed, or cancelled. If something failed, read its history before deciding what to do next.",
           example:
-            "Check whether a delegated analysis is still queued or failed, then inspect its details to decide the next action.",
-          note: "Queued work needs a running internal worker. These jobs reason over supplied material; they do not autonomously test targets.",
+            "Waiting on an analysis? Check its status, then open the results from its investigation when it's finished.",
+          note: "Queued work waits for a worker to pick it up. Analysis uses saved material; it doesn't test targets on its own.",
         },
       },
       {
@@ -131,10 +131,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/findings",
         help: {
           description:
-            "Build reviewable claims with an affected asset, impact, severity rationale, and linked evidence. Record a human verification conclusion before reporting.",
+            "Explain what you found, which asset is affected, and why the impact matters. Link the evidence and ask a human reviewer to verify the claim before reporting it.",
           example:
-            "Create a draft from an investigation, link approved supporting evidence, assess severity, and submit it for human review.",
-          note: "AI suggestions and imported results cannot confirm a finding.",
+            "Start a finding from an investigation, link approved evidence, explain the severity, and send it for human review.",
+          note: "AI and tool results can help you investigate. A human reviewer must confirm the finding.",
         },
       },
       {
@@ -142,10 +142,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/evidence",
         help: {
           description:
-            "Store investigation-owned supporting material with its source, collection details, and review status. Link approved evidence to the claims it supports or contradicts.",
+            "Save the material behind your research, along with where and how you collected it. After review, link approved evidence to the claims it supports or challenges.",
           example:
-            "Upload a redacted request/response capture and explain when, where, and how it was collected.",
-          note: "Evidence approval and AI-safe review are separate gates. Uploading a file does not automatically pass either gate.",
+            "Upload a redacted request or response, and note when, where, and how you captured it.",
+          note: "A reviewer must approve the evidence and separately check whether it's safe for AI. Uploading alone doesn't complete either review.",
         },
       },
       {
@@ -153,10 +153,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/reports",
         help: {
           description:
-            "Prepare investigation reports from reviewed findings using templates or a reviewable AI draft. Revisions preserve the report's history and source relationships.",
+            "Turn reviewed findings into a write-up. Start with a template or an AI draft you can check, then save revisions to keep the report's history and sources together.",
           example:
-            "Select reportable findings, review the generated narrative, approve the revision, and export it for sharing.",
-          note: "Human approval and source readiness remain required. The platform does not submit reports for you.",
+            "Choose reportable findings, check the write-up and its sources, then get human approval before exporting.",
+          note: "Export needs human approval and source records that are ready to use. Once exported, you submit the report yourself.",
         },
       },
     ],
@@ -169,9 +169,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/dashboard/settings",
         help: {
           description:
-            "Check your account details, personal workspace membership, and recorded activity. Use the account menu to manage your sign-in profile.",
-          example:
-            "Replay the workspace tour when you want a refresher on projects, evidence, AI assistance, and reporting.",
+            "Check your account, workspace membership, and activity history here. To change your sign-in profile, use the account menu above.",
+          example: "Feeling a little lost? Replay the tour from Settings for a quick refresher.",
         },
       },
     ],

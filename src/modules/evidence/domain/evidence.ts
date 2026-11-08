@@ -117,12 +117,15 @@ export const evidenceIntentSchema = z.object({
   fileSize: z.coerce
     .number()
     .int()
-    .min(1, "The file is empty.")
-    .max(MAX_EVIDENCE_BYTES, "Evidence files must be 25 MB or smaller."),
+    .min(1, "This file is empty. Choose a file with content to upload.")
+    .max(MAX_EVIDENCE_BYTES, "This file is too large. Choose an evidence file of 25 MB or less."),
   checksum: z
     .string()
     .trim()
-    .regex(/^[a-f0-9]{64}$/i, "The SHA-256 checksum is invalid."),
+    .regex(
+      /^[a-f0-9]{64}$/i,
+      "We couldn't verify the file's checksum. Choose the file again so its checksum can be recalculated.",
+    ),
   source: optionalText(500),
 });
 

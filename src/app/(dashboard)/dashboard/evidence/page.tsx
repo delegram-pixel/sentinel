@@ -42,7 +42,7 @@ async function EvidenceContent({ searchParams }: EvidencePageProps) {
     <div className="page-stack">
       <PageHeader
         title="Evidence"
-        description="Original files, source references, and relationships to your research. Redaction status makes clear which records are ready to support a finding."
+        description="Keep the proof close to the research. Upload files from an investigation, then open them here to check their source and redaction review before linking them to a finding."
         actions={
           investigationId ? (
             <Button asChild>

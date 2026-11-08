@@ -21,7 +21,7 @@ export default function RemediationPage() {
     <div className="page-stack">
       <PageHeader
         title="Remediation & outcomes"
-        description="Document fixes, authorized manual retests and human-entered submission history."
+        description="Follow a finding through to the fix. Create a plan, track progress, record an authorized manual retest, and add any submission outcome so the story has an ending."
       />
       <Suspense fallback={<p>Loading research outcomes…</p>}>
         <Content />
@@ -160,7 +160,7 @@ async function Content() {
                         name: "evidenceIds",
                         label: "Approved evidence IDs",
                         required: true,
-                        help: "Comma-separated IDs from this finding's investigation.",
+                        help: "Copy evidence IDs from this finding's investigation and separate them with commas.",
                       },
                       {
                         name: "conclusion",
@@ -236,7 +236,8 @@ async function Content() {
           ]}
         />
         <p className="text-sm text-muted-foreground">
-          These records document actions taken by a person outside Sentinel.
+          Use these records to note what you submitted or heard back outside Sentinel. The app keeps
+          the history; you handle the submission.
         </p>
       </ResearchSection>
       <ResearchSection id="outcome-history" title="Outcome history">
@@ -253,7 +254,10 @@ async function Content() {
             ))}
           </ul>
         ) : (
-          <p>No external outcomes recorded.</p>
+          <p>
+            No submission outcomes yet. Record one above when you&apos;ve submitted the work or
+            heard back.
+          </p>
         )}
       </ResearchSection>
     </>

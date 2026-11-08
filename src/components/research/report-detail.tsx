@@ -23,30 +23,31 @@ const STATUS_GUIDANCE: Record<
   DRAFT: {
     title: "Draft report",
     description:
-      "Only confirmed or reportable findings and approved evidence are included. Edit the Markdown and save a revision before submitting for review.",
+      "Build the draft from confirmed or reportable findings and approved evidence. Edit the Markdown, save a revision, then send it for human review when you're ready.",
     variant: "default",
   },
   UNDER_REVIEW: {
     title: "Report under review",
     description:
-      "A human reviewer must confirm readiness before approval. Returning the report to draft is required before editing.",
+      "A human reviewer needs to check that this report is ready for approval. If it needs changes, return it to Draft before editing.",
     variant: "warning",
   },
   APPROVED: {
     title: "Report approved",
     description:
-      "The report is approved for export. Exporting Markdown records the export event and keeps the revision history intact.",
+      "This report is approved and ready to export as Markdown. Exporting records the event while keeping every saved revision.",
     variant: "success",
   },
   EXPORTED: {
     title: "Report exported",
     description:
-      "The approved Markdown export is available to download again. The report can still be archived.",
+      "Your approved Markdown export is ready to download again whenever you need it. You can also archive the report.",
     variant: "success",
   },
   ARCHIVED: {
     title: "Report archived",
-    description: "This report is retained for history. It can no longer be edited or exported.",
+    description:
+      "This report is archived. You can read its history, but editing and export are closed.",
     variant: "default",
   },
 };
@@ -69,12 +70,18 @@ export function ReportDetailView({
       <PageHeader
         title={report.title}
         description={
-          <Link
-            href={`/dashboard/investigations/${report.investigationId}`}
-            className="record-link"
-          >
-            {report.investigationTitle}
-          </Link>
+          <>
+            <p className="mb-3">
+              Shape the write-up, check its findings and evidence, then save a revision. Send it for
+              human review when it&apos;s ready; approval unlocks export.
+            </p>
+            <Link
+              href={`/dashboard/investigations/${report.investigationId}`}
+              className="record-link"
+            >
+              {report.investigationTitle}
+            </Link>
+          </>
         }
         metadata={
           <div className="flex flex-wrap items-center gap-4">
@@ -205,7 +212,7 @@ export function ReportDetailView({
       <ResearchSection
         id="report-content"
         title="Report content"
-        description="Markdown is the canonical export format. Revisions are immutable; saving creates a new version."
+        description="Edit the write-up in Markdown. Each save creates a new revision, keeping earlier versions available in the history."
         action={
           latestRevision ? (
             <span className="text-xs text-text-secondary">
@@ -232,7 +239,7 @@ export function ReportDetailView({
         ) : (
           <EmptyState
             title="No revision saved"
-            description="Save a revision before submitting this report for review."
+            description="Save your first revision, then send the report for review when the write-up is ready."
           />
         )}
       </ResearchSection>
@@ -240,7 +247,7 @@ export function ReportDetailView({
       <ResearchSection
         id="report-findings"
         title="Included findings"
-        description="Only findings confirmed or marked reportable by a human reviewer can appear in a report."
+        description="Include findings a human reviewer has confirmed or marked reportable. Other findings need verification first."
       >
         {report.findings.length ? (
           <RecordTable caption="Findings included in this report" minWidth="34rem">
@@ -270,7 +277,7 @@ export function ReportDetailView({
         ) : (
           <EmptyState
             title="No findings selected"
-            description="Reports require at least one confirmed or reportable finding."
+            description="A report needs at least one confirmed or reportable finding. Verify a finding in the investigation first."
           />
         )}
       </ResearchSection>
@@ -278,7 +285,7 @@ export function ReportDetailView({
       <ResearchSection
         id="report-evidence"
         title="Evidence references"
-        description="Evidence versions and checksums are captured in the latest saved revision."
+        description="The latest saved revision records these evidence versions and checksums, so you can see exactly which files support it."
       >
         {latestRevision?.evidenceSnapshot.length ? (
           <RecordTable caption="Evidence references in this report" minWidth="44rem">
@@ -320,7 +327,7 @@ export function ReportDetailView({
         ) : (
           <EmptyState
             title="No evidence references"
-            description="The latest revision does not include approved evidence references."
+            description="This revision has no approved evidence references yet. Check the findings' evidence and save a new revision when it's ready."
           />
         )}
       </ResearchSection>
@@ -328,7 +335,7 @@ export function ReportDetailView({
       <ResearchSection
         id="report-revisions"
         title="Revision history"
-        description="Every saved revision keeps the content, finding snapshot, and evidence snapshot from that point in time."
+        description="Revisit any saved version here. Each revision keeps the write-up, findings, and evidence exactly as they were when you saved it."
       >
         {report.revisions.length ? (
           <div className="flex flex-col gap-3">
@@ -364,7 +371,7 @@ export function ReportDetailView({
         ) : (
           <EmptyState
             title="No revisions recorded"
-            description="Save a revision to start the report history."
+            description="Save the first revision to start this report's history. Later saves will appear alongside it."
           />
         )}
       </ResearchSection>

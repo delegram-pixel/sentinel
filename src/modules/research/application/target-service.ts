@@ -65,17 +65,23 @@ export async function createTarget(
   const project = await projectStore.findProjectLookup(actor.workspaceId, projectId);
 
   if (!project) {
-    return failure("PROJECT_NOT_FOUND", "That project does not exist in this workspace.");
+    return failure(
+      "PROJECT_NOT_FOUND",
+      "We can't find that project in this workspace. Open Projects to choose an available one.",
+    );
   }
 
   if (project.status === "ARCHIVED") {
-    return failure("PROJECT_ARCHIVED", "Targets cannot be added to an archived project.");
+    return failure(
+      "PROJECT_ARCHIVED",
+      "This project is archived. Choose an active project to register a target.",
+    );
   }
 
   if (await targetStore.targetAssetExists(projectId, parsed.data.assetIdentifier)) {
     return failure(
       "TARGET_DUPLICATE",
-      "A target with that asset identifier already exists in this project.",
+      "This asset is already registered in the project. Open the existing target to continue your research.",
     );
   }
 
@@ -112,17 +118,23 @@ export async function updateTarget(
   const existing = await targetStore.findTarget(actor.workspaceId, targetId);
 
   if (!existing) {
-    return failure("TARGET_NOT_FOUND", "That target does not exist in this workspace.");
+    return failure(
+      "TARGET_NOT_FOUND",
+      "We can't find that target in this workspace. Open Targets to choose an available one.",
+    );
   }
 
   const project = await projectStore.findProjectLookup(actor.workspaceId, existing.projectId);
 
   if (!project) {
-    return failure("PROJECT_NOT_FOUND", "That project does not exist in this workspace.");
+    return failure(
+      "PROJECT_NOT_FOUND",
+      "We can't find that project in this workspace. Open Projects to choose an available one.",
+    );
   }
 
   if (project.status === "ARCHIVED") {
-    return failure("PROJECT_ARCHIVED", "Targets in an archived project cannot be edited.");
+    return failure("PROJECT_ARCHIVED", "This project is archived, so its targets are read-only.");
   }
 
   if (
@@ -134,7 +146,7 @@ export async function updateTarget(
   ) {
     return failure(
       "TARGET_DUPLICATE",
-      "Another target in this project already uses that asset identifier.",
+      "Another target in this project uses that identifier. Check the existing target or enter a different asset.",
     );
   }
 
@@ -161,7 +173,10 @@ export async function updateTarget(
   );
 
   if (!updated) {
-    return failure("TARGET_NOT_FOUND", "That target does not exist in this workspace.");
+    return failure(
+      "TARGET_NOT_FOUND",
+      "We can't find that target in this workspace. Open Targets to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };

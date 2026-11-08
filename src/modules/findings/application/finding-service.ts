@@ -77,11 +77,14 @@ function assertEditable(context: {
   investigationStatus: string;
 }): DomainResult<true> {
   if (context.projectStatus === "ARCHIVED") {
-    return failure("PROJECT_ARCHIVED", "Findings in an archived project cannot be changed.");
+    return failure("PROJECT_ARCHIVED", "This project is archived, so its findings are read-only.");
   }
 
   if (context.investigationStatus === "ARCHIVED") {
-    return failure("INVESTIGATION_ARCHIVED", "An archived investigation cannot be changed.");
+    return failure(
+      "INVESTIGATION_ARCHIVED",
+      "This investigation is archived. You can revisit its history, but editing is closed.",
+    );
   }
 
   return { ok: true, value: true };
@@ -120,7 +123,7 @@ export async function createFinding(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -140,7 +143,7 @@ export async function createFinding(
     if (!hypothesis) {
       return failure(
         "HYPOTHESIS_NOT_FOUND",
-        "That hypothesis does not belong to this investigation.",
+        "Choose a hypothesis from this investigation so the finding stays connected to its research.",
       );
     }
   }
@@ -189,7 +192,10 @@ export async function updateFinding(
   const existing = await store.findFinding(actor.workspaceId, findingId);
 
   if (!existing) {
-    return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "We can't find that finding in this workspace. Open Findings to choose an available one.",
+    );
   }
 
   const investigation = await store.findInvestigation(actor.workspaceId, existing.investigationId);
@@ -197,7 +203,7 @@ export async function updateFinding(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -210,7 +216,7 @@ export async function updateFinding(
   if (existing.status !== "DRAFT" && existing.status !== "NEEDS_VALIDATION") {
     return failure(
       "FINDING_LOCKED",
-      "Only draft or needs-validation findings can be edited. Use a verification review for later changes.",
+      "You can edit findings in Draft or Needs validation. At later stages, use a verification review to record changes.",
     );
   }
 
@@ -224,7 +230,7 @@ export async function updateFinding(
     if (!hypothesis) {
       return failure(
         "HYPOTHESIS_NOT_FOUND",
-        "That hypothesis does not belong to this investigation.",
+        "Choose a hypothesis from this investigation so the finding stays connected to its research.",
       );
     }
   }
@@ -259,7 +265,10 @@ export async function updateFinding(
   );
 
   if (!updated) {
-    return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "We can't find that finding in this workspace. Open Findings to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };
@@ -281,7 +290,10 @@ export async function assessFindingSeverity(
   const existing = await store.findFinding(actor.workspaceId, findingId);
 
   if (!existing) {
-    return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "We can't find that finding in this workspace. Open Findings to choose an available one.",
+    );
   }
 
   const investigation = await store.findInvestigation(actor.workspaceId, existing.investigationId);
@@ -289,7 +301,7 @@ export async function assessFindingSeverity(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -300,7 +312,10 @@ export async function assessFindingSeverity(
   }
 
   if (existing.status === "CLOSED") {
-    return failure("FINDING_CLOSED", "A closed finding cannot be reassessed.");
+    return failure(
+      "FINDING_CLOSED",
+      "This finding is closed, so severity reassessment is no longer available.",
+    );
   }
 
   const updated = await store.assessSeverity(
@@ -331,7 +346,10 @@ export async function assessFindingSeverity(
   );
 
   if (!updated) {
-    return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "We can't find that finding in this workspace. Open Findings to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };
@@ -353,7 +371,10 @@ export async function changeFindingStatus(
   const existing = await store.findFinding(actor.workspaceId, findingId);
 
   if (!existing) {
-    return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "We can't find that finding in this workspace. Open Findings to choose an available one.",
+    );
   }
 
   const investigation = await store.findInvestigation(actor.workspaceId, existing.investigationId);
@@ -361,7 +382,7 @@ export async function changeFindingStatus(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -376,7 +397,7 @@ export async function changeFindingStatus(
   if (next === "CONFIRMED" || next === "FALSE_POSITIVE" || next === "REJECTED") {
     return failure(
       "HUMAN_REVIEW_REQUIRED",
-      "Record a human verification review to confirm, reject, or mark a finding as a false positive.",
+      "Use a human verification review to record the decision to confirm, reject, or mark this finding as a false positive.",
     );
   }
 
@@ -394,7 +415,10 @@ export async function changeFindingStatus(
 
   if (next === "REPORTABLE") {
     if (!isReviewer(actor.role)) {
-      return failure("FORBIDDEN_FINDING_ACTOR", "A human reviewer must mark a finding reportable.");
+      return failure(
+        "FORBIDDEN_FINDING_ACTOR",
+        "Ask a human reviewer to check the finding and mark it reportable.",
+      );
     }
 
     const problems = reportabilityReadiness(readinessOf(existing));
@@ -410,7 +434,7 @@ export async function changeFindingStatus(
     if (!confirmedReview) {
       return failure(
         "HUMAN_REVIEW_REQUIRED",
-        "A human confirmation review must exist before a finding becomes reportable.",
+        "Have a human reviewer record a confirmation review before marking this finding reportable.",
       );
     }
   }
@@ -432,7 +456,10 @@ export async function changeFindingStatus(
   );
 
   if (!updated) {
-    return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "We can't find that finding in this workspace. Open Findings to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };
@@ -454,14 +481,17 @@ export async function reviewFinding(
   if (!isReviewer(actor.role)) {
     return failure(
       "FORBIDDEN_FINDING_ACTOR",
-      "A human reviewer must record a verification review.",
+      "Ask a human reviewer to record the verification decision.",
     );
   }
 
   const existing = await store.findFinding(actor.workspaceId, findingId);
 
   if (!existing) {
-    return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "We can't find that finding in this workspace. Open Findings to choose an available one.",
+    );
   }
 
   const investigation = await store.findInvestigation(actor.workspaceId, existing.investigationId);
@@ -469,7 +499,7 @@ export async function reviewFinding(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -535,7 +565,10 @@ export async function reviewFinding(
   );
 
   if (!review) {
-    return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "We can't find that finding in this workspace. Open Findings to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: review.finding.id } };
@@ -571,21 +604,30 @@ export async function confirmDuplicateFinding(
   const parsed = duplicateConfirmationSchema.safeParse(rawInput);
 
   if (!parsed.success) {
-    return failure("VALIDATION_FAILED", "Choose a canonical finding.");
+    return failure("VALIDATION_FAILED", "Choose the original finding that this one duplicates.");
   }
 
   if (!isReviewer(actor.role)) {
-    return failure("FORBIDDEN_FINDING_ACTOR", "A human reviewer must confirm a duplicate.");
+    return failure(
+      "FORBIDDEN_FINDING_ACTOR",
+      "Ask a human reviewer to check the match and confirm whether it's a duplicate.",
+    );
   }
 
   if (parsed.data.canonicalFindingId === findingId) {
-    return failure("DUPLICATE_SELF_REFERENCE", "A finding cannot be a duplicate of itself.");
+    return failure(
+      "DUPLICATE_SELF_REFERENCE",
+      "Choose a different finding as the original. A finding can't duplicate itself.",
+    );
   }
 
   const existing = await store.findFinding(actor.workspaceId, findingId);
 
   if (!existing) {
-    return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "We can't find that finding in this workspace. Open Findings to choose an available one.",
+    );
   }
 
   if (existing.status !== "UNDER_REVIEW") {
@@ -601,7 +643,7 @@ export async function confirmDuplicateFinding(
   );
 
   if (!canonical || canonical.investigationId !== existing.investigationId) {
-    return failure("FINDING_NOT_FOUND", "That canonical finding is not in this investigation.");
+    return failure("FINDING_NOT_FOUND", "Choose the original finding from this investigation.");
   }
 
   try {
@@ -621,7 +663,10 @@ export async function confirmDuplicateFinding(
     );
 
     if (!updated) {
-      return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+      return failure(
+        "FINDING_NOT_FOUND",
+        "We can't find that finding in this workspace. Open Findings to choose an available one.",
+      );
     }
 
     return { ok: true, value: { id: updated.id } };
@@ -656,13 +701,19 @@ export async function linkEvidenceToFinding(
   const parsed = evidenceLinkSchema.safeParse(rawInput);
 
   if (!parsed.success) {
-    return failure("VALIDATION_FAILED", "Choose approved evidence and a relationship.");
+    return failure(
+      "VALIDATION_FAILED",
+      "Choose approved evidence and say how it relates to the finding.",
+    );
   }
 
   const finding = await store.findFinding(actor.workspaceId, parsed.data.findingId);
 
   if (!finding) {
-    return failure("FINDING_NOT_FOUND", "That finding does not exist in this workspace.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "We can't find that finding in this workspace. Open Findings to choose an available one.",
+    );
   }
 
   const investigation = await store.findInvestigation(actor.workspaceId, finding.investigationId);
@@ -670,7 +721,7 @@ export async function linkEvidenceToFinding(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 

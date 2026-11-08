@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
+import { useWorkspaceMap } from "@/components/onboarding/workspace-map-provider";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
 type AppShellProps = {
@@ -14,6 +15,8 @@ type AppShellProps = {
 
 export function AppShell({ children, workspaceName, accountMenu }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pendingMapTrigger = useRef<HTMLElement | null>(null);
+  const { openMap } = useWorkspaceMap();
 
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 1024px)");
@@ -40,12 +43,26 @@ export function AppShell({ children, workspaceName, accountMenu }: AppShellProps
           side="left"
           closeLabel="Close navigation"
           className="w-56 border-r-0 bg-surface"
+          onCloseAutoFocus={(event) => {
+            const trigger = pendingMapTrigger.current;
+            if (!trigger) return;
+            event.preventDefault();
+            pendingMapTrigger.current = null;
+            openMap(trigger);
+          }}
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <SheetDescription className="sr-only">
             Workspace, research, and account navigation.
           </SheetDescription>
-          <Sidebar onNavigate={() => setMobileOpen(false)} />
+          <Sidebar
+            onNavigate={() => setMobileOpen(false)}
+            onOpenMap={(trigger) => {
+              // Open after the drawer releases its focus trap.
+              pendingMapTrigger.current = trigger;
+              setMobileOpen(false);
+            }}
+          />
         </SheetContent>
         <div className="lg:pl-56">
           <Header workspaceName={workspaceName} accountMenu={accountMenu} />

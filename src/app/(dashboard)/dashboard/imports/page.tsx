@@ -15,7 +15,7 @@ export default function ImportsPage() {
     <div className="page-stack">
       <PageHeader
         title="Tool imports"
-        description="Review supplied tool exports while preserving their original records."
+        description="Bring your tool results into the research. Choose an engagement, upload or paste a JSON, CSV, or SARIF export, then review the imported records before using them."
       />
       <Suspense fallback={<p>Loading imports…</p>}>
         <Content />
@@ -59,7 +59,7 @@ async function Content() {
               label: "UTF-8 export file",
               type: "file",
               accept: ".json,.csv,.sarif",
-              help: "Up to 500 KB and 1000 records.",
+              help: "Choose an export with up to 1000 records and a file size of 500 KB or less.",
             },
             {
               name: "rawContent",
@@ -72,7 +72,7 @@ async function Content() {
               label: "Field mapping (optional)",
               type: "textarea",
               maxLength: 2000,
-              help: 'JSON and CSV use canonical field names by default. Example: {"title":"Name","assetReference":"Host","sourceRecordId":"ID"}. SARIF has its own parser.',
+              help: 'For JSON or CSV, map your export\'s column names if they differ from the defaults. Example: {"title":"Name","assetReference":"Host","sourceRecordId":"ID"}. SARIF doesn\'t need this mapping.',
             },
           ]}
         />
@@ -92,7 +92,7 @@ async function Content() {
             ))}
           </ul>
         ) : (
-          <p>No results imported yet.</p>
+          <p>No imports yet. Choose an engagement and add a tool export above to get started.</p>
         )}
       </ResearchSection>
     </>

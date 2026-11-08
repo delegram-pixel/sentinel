@@ -27,9 +27,7 @@ export default async function EditProjectPage({ params }: EditProjectPageProps) 
   return (
     <FormPage
       title="Edit project"
-      description={
-        <> Update how this project is described. Targets and scope are managed separately. </>
-      }
+      description="Refine the name, description, or project type so this research is easy to recognise. To manage its assets and permissions, open Targets from the project page."
       backHref={`/dashboard/projects/${projectId}`}
       backLabel="Back to project"
     >

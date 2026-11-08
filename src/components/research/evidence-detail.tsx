@@ -60,12 +60,18 @@ export function EvidenceDetailView({
       <PageHeader
         title={evidence.title}
         description={
-          <Link
-            href={`/dashboard/investigations/${evidence.investigationId}`}
-            className="record-link"
-          >
-            {evidence.investigationTitle}
-          </Link>
+          <>
+            <p className="mb-3">
+              Inspect the file and check its source details. A human reviewer must resolve redaction
+              before this evidence can support a finding or enter AI context.
+            </p>
+            <Link
+              href={`/dashboard/investigations/${evidence.investigationId}`}
+              className="record-link"
+            >
+              {evidence.investigationTitle}
+            </Link>
+          </>
         }
         metadata={
           <div className="flex flex-wrap items-center gap-4">
@@ -149,7 +155,8 @@ export function EvidenceDetailView({
         <AlertDescription>
           <p>{scanSummary(evidence.scanFindings)}</p>
           <p className="mt-2 text-xs">
-            Scan results are advisory. A human reviewer makes the redaction and activation decision.
+            Use the scan results to help check the file. A human reviewer decides whether redaction
+            is complete and the evidence can be activated.
           </p>
         </AlertDescription>
       </Alert>
@@ -157,7 +164,7 @@ export function EvidenceDetailView({
         <ResearchSection
           id="evidence-redaction"
           title="Redaction review"
-          description="Review the original file before activating it. Quarantined content cannot be linked to findings or enter AI context."
+          description="Inspect the original file before approving it. While it's quarantined, it can't support a finding or be used in AI context."
         >
           <div className="max-w-3xl">
             <RedactionReviewForm
@@ -171,7 +178,7 @@ export function EvidenceDetailView({
       <ResearchSection
         id="evidence-metadata"
         title="Record metadata"
-        description="Edit the description and source without replacing file content."
+        description="Update the description or source here to make the file easier to understand. To change the file itself, use the replacement workflow."
       >
         <Disclosure title="Edit metadata">
           <div className="max-w-3xl">
@@ -191,8 +198,8 @@ export function EvidenceDetailView({
         title="Linked findings"
         description={
           approved
-            ? "Relationships identify supporting evidence, contradictions, context, and reproduction records."
-            : "Resolve redaction before linking this evidence to a finding."
+            ? "Connect this evidence to the finding it supports, challenges, explains, or helps reproduce."
+            : "Complete the redaction review before connecting this evidence to a finding."
         }
       >
         {evidence.findingLinks.length ? (
@@ -240,8 +247,8 @@ export function EvidenceDetailView({
             title="No linked findings"
             description={
               approved
-                ? "Connect this record to a finding when it supports, contradicts, or provides context for the research."
-                : "Complete redaction review before linking this file to a finding."
+                ? "Link this record to a finding and say how it helps: support, contradiction, or useful context."
+                : "Finish the redaction review first, then you can link this file to a finding."
             }
           />
         )}
@@ -257,8 +264,8 @@ export function EvidenceDetailView({
       </ResearchSection>
       <ResearchSection id="evidence-danger" title="Evidence retention">
         <p className="mb-5 max-w-2xl text-sm text-text-secondary">
-          Deletion removes the stored object and marks this record deleted. Unlink it from findings
-          before deleting it.
+          Deleting removes the stored file and marks this record as deleted. Remove any finding
+          links first, and check that you&apos;re ready to lose the file.
         </p>
         <DeleteEvidenceForm evidenceId={evidence.id} investigationId={evidence.investigationId} />
       </ResearchSection>

@@ -48,7 +48,7 @@ async function UploadEvidenceContent({ searchParams }: UploadEvidencePageProps) 
   return (
     <FormPage
       title="Upload evidence"
-      description={`Evidence for ${investigation.title}.`}
+      description={`Add a screenshot, log, or other supporting file to ${investigation.title}, and note where it came from. It stays quarantined until a human reviewer resolves redaction.`}
       backHref={`/dashboard/investigations/${investigation.id}`}
       backLabel="Back to investigation"
     >

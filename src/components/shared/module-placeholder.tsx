@@ -25,11 +25,11 @@ export function ModulePlaceholder({ title, description, nextStep }: ModulePlaceh
         </ResearchSection>
         <ResearchSection id="research-continuity" title="Keep the research connected">
           <p className="text-sm leading-relaxed text-text-secondary">
-            Continue recording observations, testing hypotheses, and saving session summaries in
-            your investigations.
+            Keep recording observations, exploring hypotheses, and saving session summaries in your
+            investigations while this section takes shape.
           </p>
           <p className="mt-4 text-sm leading-relaxed text-text-secondary">
-            Research conclusions depend on source records and human review.
+            Check the source records and get human review before relying on a research conclusion.
           </p>
         </ResearchSection>
       </div>

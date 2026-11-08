@@ -26,7 +26,10 @@ async function mutate(
   if (values.occurredAt) {
     const date = new Date(String(values.occurredAt));
     if (!Number.isFinite(date.getTime()))
-      return { status: "error", message: "Enter the event's actual date and time." };
+      return {
+        status: "error",
+        message: "Enter when the event actually happened, including the date and time.",
+      };
     values.occurredAt = date.toISOString();
   }
   for (const key of ["reportId", "findingId"]) if (values[key] === "") delete values[key];
@@ -38,7 +41,7 @@ async function mutate(
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/dashboard/remediation");
   revalidatePath("/dashboard/findings", "layout");
-  return { status: "success", message: "Human research record saved." };
+  return { status: "success", message: "Saved. Your research record is ready to revisit." };
 }
 export async function createRemediationAction(_state: ResearchFormState, data: FormData) {
   return mutate(data, createRemediation);

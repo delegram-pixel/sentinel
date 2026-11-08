@@ -19,6 +19,7 @@ export async function adoptSuggestionAction(
   revalidatePath("/dashboard/investigations", "layout");
   return {
     status: "success",
-    message: "Suggestion adopted for research. Its source and your decision are recorded.",
+    message:
+      "The suggestion is added to your research, with its source and your adoption decision saved.",
   };
 }

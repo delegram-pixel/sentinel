@@ -50,77 +50,83 @@ export const CAPABILITY_POLICY: Record<Capability, CapabilityPolicy> = {
     requiresDocumentedTarget: false,
     requiresActiveScope: false,
     requiresHumanApproval: false,
-    description: "Read project metadata inside the requesting workspace.",
+    description: "Read this workspace's saved project details.",
   },
   READ_INVESTIGATION_CONTEXT: {
     status: "ENABLED",
     requiresDocumentedTarget: false,
     requiresActiveScope: false,
     requiresHumanApproval: false,
-    description: "Read investigation records inside the requesting workspace.",
+    description: "Read this workspace's saved investigation records.",
   },
   AI_ANALYZE_SUPPLIED_CONTENT: {
     status: "ENABLED",
     requiresDocumentedTarget: false,
     requiresActiveScope: false,
     requiresHumanApproval: false,
-    description: "Analyze content supplied by the user, without network access.",
+    description:
+      "Ask AI to analyse the content you've supplied. This uses saved material without accessing the network.",
   },
   AI_ANALYZE_TARGET_CONTEXT: {
     status: "ENABLED",
     requiresDocumentedTarget: true,
     requiresActiveScope: false,
     requiresHumanApproval: false,
-    description: "Analyze supplied target metadata. The MVP performs no network access.",
+    description:
+      "Ask AI to analyse saved target details. It uses the recorded context without connecting to the target.",
   },
   EXPORT_REPORT: {
     status: "ENABLED",
     requiresDocumentedTarget: false,
     requiresActiveScope: false,
     requiresHumanApproval: true,
-    description: "Export a report from a human-approved reportable finding.",
+    description: "Export a report based on reportable findings after a human has approved it.",
   },
   MODIFY_SCOPE: {
     status: "HUMAN_ONLY",
     requiresDocumentedTarget: false,
     requiresActiveScope: false,
     requiresHumanApproval: false,
-    description: "Create or approve a scope version. AI may never perform this action.",
+    description:
+      "Create or approve a scope version yourself. This requires a human action; AI can't do it.",
   },
   PASSIVE_FETCH: {
     status: "NOT_IMPLEMENTED",
     requiresDocumentedTarget: true,
     requiresActiveScope: true,
     requiresHumanApproval: false,
-    description: "Future passive retrieval. Requires active scope and SSRF controls.",
+    description:
+      "Fetching from a target isn't available yet. It will require an active scope and checks on which addresses can be accessed.",
   },
   ACTIVE_TEST: {
     status: "NOT_IMPLEMENTED",
     requiresDocumentedTarget: true,
     requiresActiveScope: true,
     requiresHumanApproval: true,
-    description: "Future active testing. Requires active scope and separate approval.",
+    description:
+      "Active testing isn't available yet. It will require an active scope and separate human approval.",
   },
   BROWSE_WEB: {
     status: "NOT_IMPLEMENTED",
     requiresDocumentedTarget: false,
     requiresActiveScope: false,
     requiresHumanApproval: false,
-    description: "Future browser automation. Not permitted in the MVP.",
+    description: "Automated web browsing isn't available in this version.",
   },
   EXECUTE_COMMAND: {
     status: "PROHIBITED",
     requiresDocumentedTarget: false,
     requiresActiveScope: false,
     requiresHumanApproval: false,
-    description: "Never permitted.",
+    description: "Running commands is prohibited in Sentinel.",
   },
   SUBMIT_EXTERNAL_REPORT: {
     status: "PROHIBITED",
     requiresDocumentedTarget: false,
     requiresActiveScope: false,
     requiresHumanApproval: false,
-    description: "Never permitted. Reports are exported, never submitted automatically.",
+    description:
+      "Sentinel doesn't submit reports automatically. Export an approved report, then submit it yourself.",
   },
 };
 
@@ -160,7 +166,7 @@ export function evaluateCapability(
     return {
       allowed: false,
       code: "UNKNOWN_CAPABILITY",
-      message: `Unknown capability: ${String(capability)}.`,
+      message: `This action isn't recognised: ${String(capability)}.`,
     };
   }
 
@@ -168,7 +174,7 @@ export function evaluateCapability(
     return {
       allowed: false,
       code: "CAPABILITY_PROHIBITED",
-      message: `${capability} is prohibited.`,
+      message: `${CAPABILITY_LABELS[capability]} is prohibited in Sentinel.`,
     };
   }
 
@@ -176,7 +182,7 @@ export function evaluateCapability(
     return {
       allowed: false,
       code: "CAPABILITY_NOT_IMPLEMENTED",
-      message: `${capability} is not implemented in this release.`,
+      message: `${CAPABILITY_LABELS[capability]} isn't available in this version.`,
     };
   }
 
@@ -184,7 +190,7 @@ export function evaluateCapability(
     return {
       allowed: false,
       code: "HUMAN_ONLY_CAPABILITY",
-      message: `${capability} requires an explicit human action.`,
+      message: `${CAPABILITY_LABELS[capability]} needs a human action. AI can't do it for you.`,
     };
   }
 
@@ -192,7 +198,7 @@ export function evaluateCapability(
     return {
       allowed: false,
       code: "TARGET_NOT_DOCUMENTED",
-      message: `${capability} requires a documented target.`,
+      message: `Register the target before using ${CAPABILITY_LABELS[capability]}.`,
     };
   }
 
@@ -200,7 +206,7 @@ export function evaluateCapability(
     return {
       allowed: false,
       code: "SCOPE_NOT_ACTIVE",
-      message: `${capability} requires an active scope.`,
+      message: `Activate an approved scope before using ${CAPABILITY_LABELS[capability]}.`,
     };
   }
 
@@ -208,7 +214,7 @@ export function evaluateCapability(
     return {
       allowed: false,
       code: "HUMAN_APPROVAL_REQUIRED",
-      message: `${capability} requires human approval.`,
+      message: `Get human approval before using ${CAPABILITY_LABELS[capability]}.`,
     };
   }
 

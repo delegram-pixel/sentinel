@@ -20,110 +20,115 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { DismissWorkspaceTourResult } from "@/modules/auth/domain/workspace-tour";
 import { HelpTooltip } from "@/components/shared/help-tooltip";
+import { ResearchRoutePreview } from "@/components/onboarding/research-route-preview";
 
 const STEPS = [
   {
     label: "Welcome",
     title: "Your research starts here.",
     description:
-      "Welcome to Sentinel Research. Turn observations into evidence, and evidence into findings you can stand behind.",
+      "Welcome to Sentinel. Let's give your research a home, follow the clues, and build findings you can explain with confidence.",
     icon: Compass,
     location: "Workspace → Dashboard",
     points: [
-      "Plan your work in a project with clear targets and scope.",
-      "Build an investigation from observations, hypotheses, and evidence.",
-      "Review your findings, then prepare a report and track the outcome.",
+      "Start a project, add your targets, and set clear testing boundaries.",
+      "Follow a question in an investigation, keeping observations, ideas, and evidence together.",
+      "Review the findings, write them up, and keep track of what happens next.",
     ],
-    note: "This is a short tour. You can skip it at any time and replay it from Settings.",
+    note: "This tour is short. Skip whenever you like and replay it from Settings. There won't be a quiz.",
     example:
-      "A typical workflow starts with a lab project and target, follows one research question in an investigation, then connects the verified claim to evidence and a report.",
-    outcome: "Your work stays connected from the original question to the final outcome.",
+      "Try a lab project with one target and one question. Record your observations, connect the evidence, then write up the finding once a human reviewer has verified it.",
+    outcome: "You'll be able to follow your work from the first question to the final outcome.",
   },
   {
     label: "Projects & scope",
     title: "Start with a clear boundary.",
     description:
-      "Projects keep related research together. Add a target, document permission, and define the scope before starting an investigation.",
+      "Create a project to keep related work together. Add a target and record your permission, then define its scope before testing. You can start an investigation to take notes along the way.",
     icon: FolderOpen,
     location: "Workspace → Projects · Research → Targets",
     points: [
-      "Create a project for a lab, an assessment, or a research programme.",
-      "Add targets and activate an approved scope with allowed assets, activities, and dates.",
-      "Use engagements to group related work and record its objective.",
+      "Give your lab, assessment, or research programme its own project.",
+      "Add targets, then activate an approved scope covering the allowed assets, activities, and dates.",
+      "Use an engagement to give a round of work a shared objective.",
     ],
-    note: "An engagement or tour step never grants permission. The active scope controls what the platform permits.",
+    note: "The active scope defines what you can do. Creating an engagement or finishing this tour doesn't grant permission.",
     example:
-      "Create a Learning lab project, add lab.example.test as a target, and record the permission source. Define allowed assets, excluded assets, permitted activities, and the effective window. Save the scope draft, review it, then activate it before relying on it.",
-    outcome: "A project and target with an explicit, current research boundary.",
+      "Create a Learning lab project and add lab.example.test. Record where your permission comes from, then set allowed assets, exclusions, activities, and dates. Save and review the scope draft, then activate it before testing.",
+    outcome:
+      "You'll have a project, a target, and clear boundaries for the work you're allowed to do.",
   },
   {
     label: "Investigations",
     title: "Follow the question.",
     description:
-      "An investigation is your working research record. Capture what you observed, form a hypothesis, and keep track of the next decision.",
+      "An investigation is where you work through a question. Save what you saw, describe what it might mean, and leave yourself a useful next step.",
     icon: Search,
     location: "Workspace → Investigations",
     points: [
-      "Keep observations, hypotheses, and research decisions in one place.",
-      "Use guided AI for a focused question or delegated analysis for a staged review of supplied material.",
-      "Inspect the sources and reasoning before adopting an AI suggestion.",
+      "Keep what you saw, what you suspect, and what you decided in one place.",
+      "Ask a focused question in Guided mode, or use Delegated mode for a staged review of saved material.",
+      "Check the AI's sources and reasoning before bringing a suggestion into your research.",
     ],
-    note: "AI is advisory. It analyses supplied context; it does not autonomously test targets or confirm findings.",
+    note: "AI helps you reason about saved material. It doesn't test targets on its own, and a human reviewer still needs to confirm findings.",
     example:
-      "Create an investigation with the objective ‘Determine whether the supplied response exposes another account’s profile’. Save the observation, describe a possible explanation, and record which evidence would confirm or contradict it. Ask a guided follow-up question or run a delegated analytical review, then inspect its recorded sources and execution history.",
-    outcome: "A focused question, an attributable research trail, and proposals you can review.",
+      "Ask whether a saved response exposes another account's profile. Record the observation, your possible explanation, and what could prove or rule it out. Try a Guided question or Delegated analysis, then check the result's sources and task history.",
+    outcome:
+      "You'll have a focused question, a record of how you explored it, and suggestions you can check.",
   },
   {
     label: "Evidence",
     title: "Keep the source with the claim.",
     description:
-      "Evidence makes your work reviewable. Attach supporting material to the investigation and link it to the findings it supports.",
+      "Help someone else follow the clues. Save supporting material in the investigation and link approved evidence to the findings it supports or challenges.",
     icon: FileCheck2,
     location: "Research → Evidence · Tool imports",
     points: [
-      "Record the source and collection details for each piece of evidence.",
-      "Review and redact sensitive content before approving evidence or making it available to AI.",
-      "Import supplied tool results, then review them before adopting records.",
+      "Note where each piece of evidence came from and how you collected it.",
+      "Check and redact sensitive content before evidence approval or AI-safe review.",
+      "Bring in tool exports, then check the results before adopting them as research drafts.",
     ],
-    note: "An imported result is a research lead. Keep its provenance and verify it before treating it as a finding.",
+    note: "Treat imported results as leads. Keep their source details and verify the claims before relying on them.",
     example:
-      "Upload a redacted response capture with its source, collection date, and method. Inspect upload validation and complete the human evidence review. Decide separately whether the material is AI-safe, then link approved material to the finding as support, contradiction, or context. Use Tool imports for supplied JSON, CSV, or SARIF results.",
-    outcome: "Traceable source material with explicit review status and relationships to claims.",
+      "Upload a redacted response capture with its source, date, and collection method. Check upload validation, complete the human evidence review, and separately review whether it's safe for AI. Then link approved evidence as support, contradiction, or context. Tool exports go in Tool imports.",
+    outcome:
+      "You'll have evidence someone can trace back to its source, with clear review status and links to your claims.",
   },
   {
     label: "Verification",
     title: "Make the finding defensible.",
     description:
-      "A finding connects an affected asset, an explanation, and supporting evidence. Human review determines whether the claim is ready.",
+      "Explain the issue, identify the affected asset, and show the supporting evidence. A human reviewer checks whether the claim is ready to stand on its own.",
     icon: ShieldCheck,
     location: "Research → Findings",
     points: [
-      "Describe the impact and affected asset, then explain the severity.",
-      "Link supporting evidence and record your verification reasoning.",
-      "Use an AI review to challenge assumptions; a human must confirm the finding.",
+      "Say who's affected, what can happen, and why you've chosen that severity.",
+      "Link approved evidence and explain how it supports your conclusion.",
+      "Ask AI to challenge your assumptions, then have a human reviewer verify the finding.",
     ],
-    note: "Finding status and evidence approval are separate decisions. Review both before including a claim in a report.",
+    note: "Check both the finding's status and its evidence approval before adding the claim to a report.",
     example:
-      "Write the claim as a draft, identify the affected endpoint, and explain the demonstrated impact. Link approved supporting evidence and record a severity rationale. A human reviewer records the conclusion and supporting, contradictory, or missing evidence. If the claim is confirmed and ready, move it through the reporting workflow.",
-    outcome: "A human-reviewed finding whose impact and severity are supported by evidence.",
+      "Start a draft with the affected endpoint and demonstrated impact. Link approved evidence and explain the severity. A human reviewer records the conclusion, including any conflicting or missing evidence. Once confirmed and ready, the finding can move into reporting.",
+    outcome:
+      "You'll have a finding a human has reviewed, with evidence behind its impact and severity.",
   },
   {
     label: "Reports & outcomes",
     title: "Share the work. Track what follows.",
     description:
-      "Bring reviewed findings into a report, record remediation and retests, and preserve useful research for your next investigation.",
+      "Give the reviewed findings a clear write-up, track fixes and retests, and save what you learned for the next investigation.",
     icon: FileCheck2,
     location: "Research → Reports · Remediation & outcomes · Knowledge",
     points: [
-      "Prepare a report using a template or a reviewable AI draft.",
-      "Approve the report before exporting, then record remediation and retest outcomes.",
-      "Save reviewed knowledge so future investigations can build on it.",
+      "Start your report with a template or an AI draft you can review.",
+      "Get human approval before exporting, then record fixes and authorized manual retest outcomes.",
+      "Save reviewed references and lessons in Knowledge. Future you will appreciate the shortcut.",
     ],
-    note: "Ready to begin? Create your first project, or finish the tour and explore the workspace.",
+    note: "You're ready to explore. Create your first project now, or finish the tour and have a look around.",
     example:
-      "Select ready findings and a report template, or review and adopt an AI report draft. Check the narrative and sources before human approval and export. Record remediation and a human retest with follow-up evidence. Preserve reviewed methodology or lessons in Knowledge, and use Research insights to see the recorded outcomes.",
+      "Choose ready findings and a template, or review an AI report draft. Check the write-up and sources before human approval and export. Record the fix and an authorized manual retest with follow-up evidence. Save useful lessons in Knowledge and check Research insights for progress.",
     outcome:
-      "A reviewable report, documented follow-up, and reusable knowledge for the next investigation.",
+      "You'll have a report you can share after approval, a record of the follow-up, and lessons ready for next time.",
   },
 ] as const;
 
@@ -170,7 +175,7 @@ export function WorkspaceTourDialog({
         }
       } catch {
         setError(
-          "We couldn’t save your tour preference. Try again, or close for now. You may see the tour on your next visit.",
+          "We couldn't save your tour preference. Try again or close it for now; the tour may reappear on your next visit.",
         );
       } finally {
         saving.current = false;
@@ -268,6 +273,15 @@ export function WorkspaceTourDialog({
                   {step.description}
                 </Dialog.Description>
               </div>
+              {stepIndex === 0 ? (
+                <div className="flex flex-col gap-3 border-y border-border py-4">
+                  <ResearchRoutePreview />
+                  <p className="text-xs leading-relaxed text-text-secondary">
+                    Lost your bearings? Open Workspace map at the top of the sidebar to see where
+                    you are and jump to any section. On a small screen, open the menu first.
+                  </p>
+                </div>
+              ) : null}
               <ul className="flex flex-col gap-3">
                 {step.points.map((point) => (
                   <li key={point} className="flex items-start gap-3 text-[13px] leading-relaxed">
@@ -283,7 +297,7 @@ export function WorkspaceTourDialog({
                   </p>
                   <HelpTooltip
                     label="Finding your way"
-                    description="On a desktop, use the sidebar to open a workspace section. On a smaller screen, open the navigation menu in the header. The question-mark buttons beside navigation items explain each section."
+                    description="Use the sidebar on a desktop, or open the menu in the header on a smaller screen. Tap a question mark beside a section whenever you want a quick pointer."
                     example="Choose Projects to start organizing work, or Settings to replay this tour later."
                   />
                 </div>

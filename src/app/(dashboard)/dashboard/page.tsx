@@ -143,7 +143,7 @@ async function SavedNextActions({
               ? "Session notes unavailable"
               : "No saved next actions"
           }
-          description="Record next actions in an investigation's session summary to keep the next research session focused."
+          description="Leave your next steps in an investigation's session summary. They'll show up here to help you pick up where you left off."
           action={
             <Button asChild variant="link" size="sm">
               <Link href="/dashboard/investigations">Open investigations</Link>

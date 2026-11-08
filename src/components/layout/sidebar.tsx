@@ -3,13 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
+import { Map } from "lucide-react";
 
 import { isNavItemActive, NAV_GROUPS } from "@/components/layout/nav";
+import { useWorkspaceMap } from "@/components/onboarding/workspace-map-provider";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HelpTooltip } from "@/components/shared/help-tooltip";
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+type SidebarProps = {
+  onNavigate?: () => void;
+  onOpenMap?: (trigger: HTMLElement) => void;
+};
+
+export function Sidebar({ onNavigate, onOpenMap }: SidebarProps) {
   return (
     <Suspense
       fallback={
@@ -19,13 +27,14 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </aside>
       }
     >
-      <SidebarContent onNavigate={onNavigate} />
+      <SidebarContent onNavigate={onNavigate} onOpenMap={onOpenMap} />
     </Suspense>
   );
 }
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({ onNavigate, onOpenMap }: SidebarProps) {
   const pathname = usePathname();
+  const { openMap } = useWorkspaceMap();
 
   return (
     <aside className="flex h-full w-56 flex-col border-r border-border bg-surface">
@@ -38,8 +47,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <span className="font-display text-[24px] leading-none tracking-tight">Sentinel</span>
         <span className="mt-1 text-xs leading-4 text-text-secondary">Research</span>
       </Link>
+      <div className="shrink-0 border-b border-border px-5 py-4">
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          onClick={(event) => (onOpenMap ?? openMap)(event.currentTarget)}
+        >
+          <Map data-icon="inline-start" aria-hidden />
+          Workspace map
+        </Button>
+        <p className="mt-2 px-1 text-xs text-text-secondary">Find your next stop.</p>
+      </div>
       <nav
-        className="flex flex-1 flex-col gap-7 overflow-y-auto px-5 py-8"
+        className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-5 py-6"
         aria-label="Primary navigation"
       >
         {NAV_GROUPS.map((group) => (

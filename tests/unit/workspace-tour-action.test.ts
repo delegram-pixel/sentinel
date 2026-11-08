@@ -41,7 +41,10 @@ describe("tour dismissal authentication", () => {
   it("returns a safe failure message when persistence is unavailable", async () => {
     dismiss.mockRejectedValue(new Error("private database details"));
     const result = await dismissWorkspaceTourAction();
-    expect(result).toMatchObject({ ok: false, message: expect.stringContaining("close for now") });
+    expect(result).toMatchObject({
+      ok: false,
+      message: expect.stringContaining("close it for now"),
+    });
     expect(JSON.stringify(result)).not.toContain("private database details");
     expect(revalidate).not.toHaveBeenCalled();
   });

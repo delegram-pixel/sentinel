@@ -59,7 +59,7 @@ async function ProjectInvestigationsContent({ projectId }: { projectId: string }
       </Link>
       <PageHeader
         title="Investigations"
-        description={`Research records for ${project.name}. Keep observations, hypotheses, and session history connected to their target.`}
+        description={`Follow the questions you're exploring in ${project.name}. Open an investigation to pick up its notes and next steps, or start a new one for another question.`}
         metadata={<ProjectStatusBadge status={project.status} />}
         actions={
           project.status !== "ARCHIVED" ? (

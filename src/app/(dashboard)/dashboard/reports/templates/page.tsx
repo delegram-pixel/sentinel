@@ -48,7 +48,7 @@ async function ReportTemplatesContent() {
       </Link>
       <PageHeader
         title="Report templates"
-        description="Templates control the section order of a new report. Required sections cannot be removed, and template changes never rewrite a saved report revision."
+        description="Give future reports a familiar shape. Choose a built-in layout or create a workspace template with the sections you need. Required sections stay included, and saved revisions stay as they were."
         actions={
           <Button asChild variant="outline">
             <Link href="/dashboard/reports/new">New report</Link>
@@ -59,22 +59,23 @@ async function ReportTemplatesContent() {
       <Alert>
         <AlertTitle>Required sections are protected</AlertTitle>
         <AlertDescription>
-          Every template keeps Summary, Findings, Evidence references, Assumptions and limitations,
-          and Missing information. Workspace templates can add Methodology and Recommendations.
+          Every template includes Summary, Findings, Evidence references, Assumptions and
+          limitations, and Missing information. Add Methodology or Recommendations to a workspace
+          template when they&apos;re useful.
         </AlertDescription>
       </Alert>
 
       <ResearchSection
         id="system-report-templates"
         title="System templates"
-        description="Read-only templates available to every workspace."
+        description="These built-in layouts are available to every workspace. Choose one when creating a report."
       >
         {systemTemplates.length ? (
           <TemplateTable templates={systemTemplates} canManage={false} />
         ) : (
           <EmptyState
             title="System templates are not available"
-            description="Run the pending database migration to seed the system report templates."
+            description="The built-in templates aren't set up yet. The person managing this deployment needs to run the pending database migration."
           />
         )}
       </ResearchSection>
@@ -82,7 +83,7 @@ async function ReportTemplatesContent() {
       <ResearchSection
         id="workspace-report-templates"
         title="Workspace templates"
-        description="Owner- or administrator-managed templates for this workspace. Creating a template with an existing name saves a new version."
+        description="Workspace owners and administrators can create layouts here. Reusing a template name saves a new version."
         action={
           canManage ? (
             <StatusLabel tone="success">You can manage templates</StatusLabel>
@@ -96,7 +97,7 @@ async function ReportTemplatesContent() {
         ) : (
           <EmptyState
             title="No workspace templates"
-            description="Create a workspace template to add optional sections or keep a named layout for future reports."
+            description="Create a template to save a layout for future reports, with any optional sections your readers need."
           />
         )}
 

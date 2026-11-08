@@ -66,8 +66,8 @@ export function ResearchOutput({
     return (
       <div className="flex flex-col gap-6">
         <p className="text-xs text-text-secondary">
-          Proposed hypotheses. Review the reasoning and source records before adding them to the
-          investigation.
+          Here are some ideas to explore. Check the reasoning and sources before adding a hypothesis
+          to the investigation.
         </p>
         {hypotheses.data.hypotheses.length ? (
           hypotheses.data.hypotheses.map((hypothesis, index) => (
@@ -205,7 +205,8 @@ export function ResearchOutput({
       <div className="flex flex-col gap-5">
         <Alert variant="warning">
           <AlertDescription>
-            AI review is advisory. A human decision is required to confirm a finding.
+            Use this review to help you assess the finding. Confirmation still needs a human
+            decision.
           </AlertDescription>
         </Alert>
         <p className="record-metadata">AI conclusion: {verification.data.conclusion}</p>
@@ -243,7 +244,8 @@ export function ResearchOutput({
     return agent;
   return (
     <p className="research-copy text-sm">
-      {fallback ?? "This task has no structured output available to display."}
+      {fallback ??
+        "There's no structured result to show for this task. Check its status and history for more detail."}
     </p>
   );
 }

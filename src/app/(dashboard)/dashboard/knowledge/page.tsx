@@ -14,7 +14,7 @@ export default function KnowledgePage({ searchParams }: { searchParams: Promise<
     <div className="page-stack">
       <PageHeader
         title="Research knowledge"
-        description="Curated references, lessons and source-backed research notes."
+        description="Save useful references and lessons so you can find them again. Add a note or source, then search by title or tag. Your browser tabs can finally retire."
         actions={
           <Button asChild>
             <Link href="/dashboard/knowledge/new">Add knowledge</Link>
@@ -60,7 +60,7 @@ async function Content({ searchParams }: { searchParams: Promise<{ q?: string }>
         </ul>
       ) : (
         <p className="mt-4">
-          No knowledge records match. Add a research note or supplied reference.
+          Nothing matches yet. Try another title or tag, or add a reference you&apos;d like to keep.
         </p>
       )}
     </ResearchSection>

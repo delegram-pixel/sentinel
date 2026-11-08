@@ -154,8 +154,8 @@ export function RevokeScopeForm({ projectId, targetId, scopeId }: ScopeActionsPr
     <Disclosure title="Revoke active scope">
       <Alert variant="warning">
         <AlertDescription>
-          Revocation takes effect immediately. This scope will stop authorizing target actions and
-          cannot be reactivated.
+          Revoking stops this scope&apos;s permission immediately. It can&apos;t be reactivated, so
+          further work will need a new active scope.
         </AlertDescription>
       </Alert>
       <form

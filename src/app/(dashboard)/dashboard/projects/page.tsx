@@ -17,7 +17,7 @@ export default function ProjectsPage() {
     <div className="page-stack">
       <PageHeader
         title="Projects"
-        description="Organise targets and investigations around a research objective."
+        description="Keep related research together. Start with a project, add the targets you want to study, then open an investigation when you have a question to explore."
         actions={
           <Button asChild>
             <Link href="/dashboard/projects/new">New project</Link>

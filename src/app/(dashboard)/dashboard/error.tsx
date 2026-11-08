@@ -11,7 +11,7 @@ export default function DashboardError({ retry }: { retry: () => void }) {
       <Alert variant="destructive">
         <h2 className="mb-2 text-sm font-medium">Your workspace could not be loaded</h2>
         <AlertDescription>
-          Your research overview is temporarily unavailable. Try loading it again.
+          We couldn&apos;t load your research overview. Try again to reload it.
         </AlertDescription>
         <Button className="mt-4" onClick={() => retry()}>
           Try again

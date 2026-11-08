@@ -26,13 +26,7 @@ export default async function EditTargetPage({ params }: EditTargetPageProps) {
   return (
     <FormPage
       title="Edit target"
-      description={
-        <>
-          {" "}
-          Update the asset and its authorization context. Existing scope versions are not
-          changed.{" "}
-        </>
-      }
+      description="Keep this asset's details and source of permission up to date. If the testing boundaries have changed, draft a new scope version from the target page too."
       backHref={`/dashboard/projects/${projectId}/targets/${targetId}`}
       backLabel="Back to target"
     >

@@ -17,7 +17,7 @@ export default function TasksPage() {
     <div className="page-stack">
       <PageHeader
         title="Background work"
-        description="Track research analysis and supplied-document processing."
+        description="Check on queued analysis, imports, and document processing. Open completed AI results or cancel work you no longer need. Coffee breaks don't need a progress bar."
       />
       <Suspense fallback={<p>Loading work…</p>}>
         <Content />
@@ -114,7 +114,9 @@ async function Content() {
             ))}
           </ul>
         ) : (
-          <p>No background work requested.</p>
+          <p>
+            No background work yet. Queue an analysis above, or start work from an investigation.
+          </p>
         )}
       </ResearchSection>
       {uncertain.length ? (

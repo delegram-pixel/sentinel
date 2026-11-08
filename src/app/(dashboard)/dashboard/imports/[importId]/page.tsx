@@ -25,7 +25,12 @@ async function Content({ params }: { params: Promise<{ importId: string }> }) {
     <div className="page-stack">
       <PageHeader
         title={row.fileName}
-        description={`${row.engagement.name} · ${row.sourceTool} · ${row.status}`}
+        description="Check the original export, then review each imported record below. Connect useful results to the research after you've checked them."
+        metadata={
+          <p className="text-xs text-text-secondary">
+            {row.engagement.name} · {row.sourceTool} · {row.status}
+          </p>
+        }
       />
       <ResearchSection id="provenance" title="Original source">
         <p className="text-sm break-all">SHA-256 {row.checksum}</p>

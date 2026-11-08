@@ -31,8 +31,8 @@ export function TargetList({
         title={projectId ? "No targets in this project" : "No targets yet"}
         description={
           projectId
-            ? "Register an asset to record its authorization and draft a scope version."
-            : "Targets belong to projects. Open a project to register an asset and record its scope."
+            ? "Register the asset you want to research, record your permission, then draft its scope."
+            : "Open a project to register a target, record your permission, and define its scope."
         }
         action={
           canCreate ? (

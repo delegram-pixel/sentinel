@@ -15,13 +15,15 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             A clear record of your research.
           </p>
           <p className="mt-5 text-sm leading-relaxed text-text-secondary">
-            Return to your projects, investigation history, and research context.
+            Sign in to pick up your projects, revisit investigation notes, and keep the research
+            moving.
           </p>
         </div>
         <div className="min-w-0">{children}</div>
       </main>
       <footer className="border-t border-border px-5 py-5 text-xs text-text-secondary sm:px-8 lg:px-12">
-        Authorization is self-attested. Research conclusions require human review.
+        You record and attest to your testing permission. A human reviewer checks research
+        conclusions.
       </footer>
     </div>
   );

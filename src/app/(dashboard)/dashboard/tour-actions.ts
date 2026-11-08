@@ -19,7 +19,7 @@ export async function dismissWorkspaceTourAction(): Promise<DismissWorkspaceTour
     return {
       ok: false,
       message:
-        "We couldn’t save your tour preference. Try again, or close for now. You may see the tour on your next visit.",
+        "We couldn't save your tour preference. Try again or close it for now; the tour may reappear on your next visit.",
     };
   }
 }

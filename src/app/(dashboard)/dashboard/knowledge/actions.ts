@@ -41,7 +41,7 @@ export async function reviewKnowledgeAction(
   const result = await reviewKnowledgeDocument(store, actor, Object.fromEntries(data.entries()));
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/dashboard/knowledge", "layout");
-  return { status: "success", message: "Review recorded." };
+  return { status: "success", message: "Your review is saved." };
 }
 export async function relateKnowledgeAction(
   _state: ResearchFormState,
@@ -51,5 +51,5 @@ export async function relateKnowledgeAction(
   const result = await relateKnowledgeDocuments(store, actor, Object.fromEntries(data.entries()));
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/dashboard/knowledge", "layout");
-  return { status: "success", message: "Relationship recorded." };
+  return { status: "success", message: "The connection is saved." };
 }

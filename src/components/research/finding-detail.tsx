@@ -57,12 +57,18 @@ export function FindingDetailView({
       <PageHeader
         title={finding.title}
         description={
-          <Link
-            href={`/dashboard/investigations/${finding.investigationId}`}
-            className="record-link"
-          >
-            {investigationTitle}
-          </Link>
+          <>
+            <p className="mb-3">
+              Make the case for this finding. Review the impact, link approved evidence, and request
+              a human verification decision when the details are ready.
+            </p>
+            <Link
+              href={`/dashboard/investigations/${finding.investigationId}`}
+              className="record-link"
+            >
+              {investigationTitle}
+            </Link>
+          </>
         }
         metadata={
           <div className="flex flex-wrap items-center gap-4">
@@ -164,7 +170,7 @@ export function FindingDetailView({
       <ResearchSection
         id="finding-assessment"
         title="Assessment and verification"
-        description="Severity, affected asset, and supporting evidence are required before a human reviewer can confirm a finding."
+        description="Add the severity, affected asset, and supporting evidence so a human reviewer has what they need to confirm the finding."
       >
         <p className="research-copy mb-5 text-sm text-text-secondary">
           {finding.severityRationale ?? "No severity rationale recorded."}
@@ -193,7 +199,7 @@ export function FindingDetailView({
       <ResearchSection
         id="finding-evidence"
         title="Evidence"
-        description="Only evidence approved after redaction review can be linked to a finding."
+        description="Link evidence that's passed redaction review and been approved. Other files need their review completed first."
       >
         {finding.evidenceLinks.length ? (
           <RecordTable caption="Evidence linked to this finding" minWidth="42rem">
@@ -242,7 +248,7 @@ export function FindingDetailView({
         ) : (
           <EmptyState
             title="No linked evidence"
-            description="Link supporting evidence before requesting confirmation. Relationships can also identify contradicting information or context."
+            description="Link approved supporting evidence before asking for confirmation. You can also add evidence that challenges the claim or gives useful context."
           />
         )}
         <Disclosure title="Link approved evidence" className="mt-5">
@@ -256,7 +262,7 @@ export function FindingDetailView({
       <ResearchSection
         id="finding-reviews"
         title="Review history"
-        description="AI recommendations remain advisory. Human reviews record verification decisions."
+        description="AI can suggest what to check. The human reviews here record the actual verification decisions."
       >
         {isReviewer && finding.status === "UNDER_REVIEW" ? (
           <Disclosure title="Record human verification review" className="mb-5">
@@ -282,7 +288,7 @@ export function FindingDetailView({
               </h3>
               {review.reviewerType === "AI" ? (
                 <p className="mt-2 text-xs text-text-secondary">
-                  Advisory recommendation; a human decision is still required.
+                  Use this as a suggestion. A human reviewer still needs to make the decision.
                 </p>
               ) : null}
               {review.reviewerUserId ? (
@@ -317,7 +323,7 @@ export function FindingDetailView({
         ) : (
           <EmptyState
             title="No verification reviews recorded"
-            description="A human reviewer can record a decision when this finding is under review. AI suggestions never count as confirmation."
+            description="When this finding is under review, a human reviewer can record a decision here. An AI suggestion doesn't confirm it."
           />
         )}
       </ResearchSection>
@@ -325,7 +331,7 @@ export function FindingDetailView({
         <ResearchSection
           id="finding-duplicate"
           title="Duplicate review"
-          description="Similarity is advisory. A human duplicate decision records the canonical finding and rejects this record as a duplicate."
+          description="These matches are suggestions to check. If a human reviewer marks this as a duplicate, the original finding is recorded and this one is rejected as a duplicate."
         >
           <DuplicateConfirmationForm
             findingId={finding.id}
@@ -342,7 +348,7 @@ export function FindingDetailView({
               href={`/dashboard/findings/${finding.duplicateOfId}`}
               className="record-link text-primary"
             >
-              the canonical finding
+              the original finding
             </Link>
             . Its current status is {FINDING_STATUS_LABELS[finding.status]}.
           </p>

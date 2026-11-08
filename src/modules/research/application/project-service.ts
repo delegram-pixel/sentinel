@@ -103,11 +103,17 @@ export async function updateProject(
   const existing = await store.findProject(actor.workspaceId, projectId);
 
   if (!existing) {
-    return failure("PROJECT_NOT_FOUND", "That project does not exist in this workspace.");
+    return failure(
+      "PROJECT_NOT_FOUND",
+      "We can't find that project in this workspace. Open Projects to choose an available one.",
+    );
   }
 
   if (!canEditProject(existing.status)) {
-    return failure("PROJECT_ARCHIVED", "An archived project cannot be edited.");
+    return failure(
+      "PROJECT_ARCHIVED",
+      "This project is archived. You can revisit its history, but editing is closed.",
+    );
   }
 
   const updated = await store.updateProject(
@@ -137,7 +143,10 @@ export async function updateProject(
   );
 
   if (!updated) {
-    return failure("PROJECT_NOT_FOUND", "That project does not exist in this workspace.");
+    return failure(
+      "PROJECT_NOT_FOUND",
+      "We can't find that project in this workspace. Open Projects to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };
@@ -152,11 +161,17 @@ export async function archiveProject(
   const existing = await store.findProject(actor.workspaceId, projectId);
 
   if (!existing) {
-    return failure("PROJECT_NOT_FOUND", "That project does not exist in this workspace.");
+    return failure(
+      "PROJECT_NOT_FOUND",
+      "We can't find that project in this workspace. Open Projects to choose an available one.",
+    );
   }
 
   if (existing.status === "ARCHIVED") {
-    return failure("PROJECT_ARCHIVED", "That project is already archived.");
+    return failure(
+      "PROJECT_ARCHIVED",
+      "This project is already archived. Its history is still available to read.",
+    );
   }
 
   const archived = await store.archiveProject(actor.workspaceId, projectId, now, {
@@ -169,7 +184,10 @@ export async function archiveProject(
   });
 
   if (!archived) {
-    return failure("PROJECT_NOT_FOUND", "That project does not exist in this workspace.");
+    return failure(
+      "PROJECT_NOT_FOUND",
+      "We can't find that project in this workspace. Open Projects to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: archived.id } };

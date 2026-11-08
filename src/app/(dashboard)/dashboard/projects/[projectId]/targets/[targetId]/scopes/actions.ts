@@ -122,7 +122,11 @@ export async function createScopeDraftAction(
   };
 
   if (!projectId || !targetId) {
-    return { status: "error", message: "The target identifier is missing." };
+    return {
+      status: "error",
+      message:
+        "We couldn't identify the target. Reopen it from the project's Targets page, then try again.",
+    };
   }
 
   const parsed = scopeDraftInputSchema.safeParse(input);
@@ -130,7 +134,7 @@ export async function createScopeDraftAction(
   if (!parsed.success) {
     return {
       status: "error",
-      message: "Check the highlighted fields and try again.",
+      message: "A few details need attention. Check the highlighted fields, then try again.",
       fieldErrors: draftFieldErrors(parsed.error.issues),
     };
   }
@@ -140,7 +144,11 @@ export async function createScopeDraftAction(
   const target = await store.findTargetLookup(session.workspace.id, targetId);
 
   if (!target || target.projectId !== projectId) {
-    return { status: "error", message: "That target does not exist in this project." };
+    return {
+      status: "error",
+      message:
+        "We can't find that target in this project. Choose one from the project's Targets page.",
+    };
   }
 
   const result = await createScopeDraft(
@@ -174,7 +182,11 @@ export async function activateScopeAction(
   };
 
   if (!projectId || !targetId || !scopeId) {
-    return { status: "error", message: "The scope identifier is missing." };
+    return {
+      status: "error",
+      message:
+        "We couldn't identify the scope. Reopen it from the target's scope history, then try again.",
+    };
   }
 
   const parsed = scopeActivationInputSchema.safeParse(input);
@@ -182,7 +194,7 @@ export async function activateScopeAction(
   if (!parsed.success) {
     return {
       status: "error",
-      message: "Check the highlighted fields and try again.",
+      message: "A few details need attention. Check the highlighted fields, then try again.",
       fieldErrors: activationFieldErrors(parsed.error.issues),
     };
   }
@@ -192,7 +204,11 @@ export async function activateScopeAction(
   const found = await store.findScope(session.workspace.id, scopeId);
 
   if (!found || found.target.projectId !== projectId) {
-    return { status: "error", message: "That scope does not exist in this project." };
+    return {
+      status: "error",
+      message:
+        "We can't find that scope in this project. Open the target's scope history to choose an available version.",
+    };
   }
 
   const result = await activateScope(
@@ -220,7 +236,11 @@ export async function revokeScopeAction(
   const scopeId = String(formData.get("scopeId") ?? "");
 
   if (!projectId || !targetId || !scopeId) {
-    return { status: "error", message: "The scope identifier is missing." };
+    return {
+      status: "error",
+      message:
+        "We couldn't identify the scope. Reopen it from the target's scope history, then try again.",
+    };
   }
 
   const session = await getSessionContext();
@@ -228,7 +248,11 @@ export async function revokeScopeAction(
   const found = await store.findScope(session.workspace.id, scopeId);
 
   if (!found || found.target.projectId !== projectId) {
-    return { status: "error", message: "That scope does not exist in this project." };
+    return {
+      status: "error",
+      message:
+        "We can't find that scope in this project. Open the target's scope history to choose an available version.",
+    };
   }
 
   const result = await revokeScope(

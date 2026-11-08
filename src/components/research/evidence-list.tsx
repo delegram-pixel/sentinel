@@ -15,7 +15,7 @@ export function EvidenceList({ evidence }: { evidence: EvidenceRow[] }) {
       <EmptyState
         headingLevel={2}
         title="No evidence recorded"
-        description="Add a screenshot, request or response, log, or document from an investigation. Files remain quarantined until a human reviewer resolves redaction."
+        description="Add a supporting file from an investigation, such as a screenshot, response, log, or document. A human reviewer must resolve redaction before it can be used."
         action={
           <Button asChild variant="outline">
             <Link href="/dashboard/investigations">Open investigations</Link>

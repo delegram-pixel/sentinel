@@ -96,7 +96,7 @@ export const scopeDraftInputSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["effectiveUntil"],
-        message: "The end date cannot be before the start date.",
+        message: "Choose an end date on or after the start date.",
       });
     }
 
@@ -104,7 +104,7 @@ export const scopeDraftInputSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["assets"],
-        message: "A scope needs at least one allowed asset.",
+        message: "Add at least one allowed asset so the scope has a clear boundary.",
       });
     }
 
@@ -117,7 +117,8 @@ export const scopeDraftInputSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["assets", index, "assetIdentifier"],
-          message: "This asset and match type already exist in the scope.",
+          message:
+            "This asset and match type are already listed. Edit the existing rule or remove the duplicate.",
         });
       }
 
@@ -128,7 +129,7 @@ export const scopeDraftInputSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["permittedActivities"],
-        message: "Each activity can appear only once.",
+        message: "An activity is listed more than once. Keep one entry for each activity.",
       });
     }
   });
@@ -137,7 +138,11 @@ export type ScopeDraftInput = z.infer<typeof scopeDraftInputSchema>;
 
 export const scopeActivationInputSchema = z
   .object({
-    authorizationSource: z.string().trim().min(3, "Name the authorization source.").max(300),
+    authorizationSource: z
+      .string()
+      .trim()
+      .min(3, "Tell us where your permission comes from, such as an agreement or programme policy.")
+      .max(300),
     authorizationDate: dateOnlySchema,
     attestationNotes: optionalText(2000),
     acknowledged: z.preprocess(
@@ -185,7 +190,10 @@ export function validateScopeActivation(
   now: Date,
 ): DomainResult<true> {
   if (scope.status !== "DRAFT") {
-    return failure("SCOPE_NOT_DRAFT", "Only a draft scope version can be activated.");
+    return failure(
+      "SCOPE_NOT_DRAFT",
+      "This version is no longer a draft. Open the target's scope history and choose a draft to activate.",
+    );
   }
 
   if (!scope.effectiveFrom || !scope.effectiveUntil) {
@@ -193,7 +201,10 @@ export function validateScopeActivation(
   }
 
   if (scope.effectiveFrom.getTime() >= scope.effectiveUntil.getTime()) {
-    return failure("SCOPE_WINDOW_INVALID", "The effective window must have a positive duration.");
+    return failure(
+      "SCOPE_WINDOW_INVALID",
+      "Set the scope's end time after its start time so the permission has a valid window.",
+    );
   }
 
   if (!scope.assets.some((asset) => asset.effect === "ALLOWED")) {
@@ -205,7 +216,10 @@ export function validateScopeActivation(
   }
 
   if (input.authorizationSource.trim().length < 3) {
-    return failure("AUTHORIZATION_SOURCE_REQUIRED", "Name the authorization source.");
+    return failure(
+      "AUTHORIZATION_SOURCE_REQUIRED",
+      "Tell us where your permission comes from, such as an agreement or programme policy.",
+    );
   }
 
   const authorizationDate = parseDateOnly(input.authorizationDate);
@@ -215,7 +229,10 @@ export function validateScopeActivation(
   }
 
   if (authorizationDate.getTime() > endOfDayUtc(now).getTime()) {
-    return failure("AUTHORIZATION_DATE_IN_FUTURE", "Authorization cannot be dated in the future.");
+    return failure(
+      "AUTHORIZATION_DATE_IN_FUTURE",
+      "Use the date your permission was granted. It can't be in the future.",
+    );
   }
 
   if (!input.acknowledged) {

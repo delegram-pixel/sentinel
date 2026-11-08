@@ -42,7 +42,7 @@ async function ReportsContent({ searchParams }: ReportsPageProps) {
     <div className="page-stack">
       <PageHeader
         title="Reports"
-        description="Research documents assembled from confirmed findings and approved evidence. Reports keep an immutable revision history and require human approval before export."
+        description="Give your research a clear write-up. Create a draft from confirmed findings and approved evidence, save revisions as you go, then get human approval before exporting."
         actions={
           <>
             <Button asChild variant="outline">

@@ -14,7 +14,7 @@ export function FindingList({ findings }: { findings: FindingRow[] }) {
       <EmptyState
         headingLevel={2}
         title="No findings recorded"
-        description="Create a candidate finding from an investigation when your observations and evidence support it. Human review determines whether it can be confirmed."
+        description="Have a lead backed by observations and evidence? Create a finding from its investigation, then send it for human review when it's ready."
         action={
           <Button asChild variant="outline">
             <Link href="/dashboard/investigations">Open investigations</Link>

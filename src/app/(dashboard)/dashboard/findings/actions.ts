@@ -125,7 +125,7 @@ function findingInvalid(
 ): FindingFormState {
   return {
     status: "error",
-    message: "Check the highlighted fields and try again.",
+    message: "A few details need attention. Check the highlighted fields, then try again.",
     fieldErrors: toFieldErrors(issues, FINDING_FIELDS),
     values,
   };
@@ -160,7 +160,12 @@ export async function createFindingAction(
   const values = readFindingValues(formData);
 
   if (!investigationId) {
-    return { status: "error", message: "The investigation identifier is missing.", values };
+    return {
+      status: "error",
+      message:
+        "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
+      values,
+    };
   }
 
   const parsed = findingInputSchema.safeParse(findingPayload(values));
@@ -195,7 +200,11 @@ export async function updateFindingAction(
   const values = readFindingValues(formData);
 
   if (!findingId) {
-    return { status: "error", message: "The finding identifier is missing.", values };
+    return {
+      status: "error",
+      message: "We couldn't identify the finding. Reopen it from Findings, then try again.",
+      values,
+    };
   }
 
   const parsed = findingUpdateSchema.safeParse(findingPayload(values));
@@ -235,7 +244,11 @@ export async function assessSeverityAction(
   };
 
   if (!findingId) {
-    return { status: "error", message: "The finding identifier is missing.", values };
+    return {
+      status: "error",
+      message: "We couldn't identify the finding. Reopen it from Findings, then try again.",
+      values,
+    };
   }
 
   const parsed = severityAssessmentSchema.safeParse({
@@ -246,7 +259,7 @@ export async function assessSeverityAction(
   if (!parsed.success) {
     return {
       status: "error",
-      message: "Check the highlighted fields and try again.",
+      message: "A few details need attention. Check the highlighted fields, then try again.",
       fieldErrors: toFieldErrors(parsed.error.issues, SEVERITY_FIELDS),
       values,
     };
@@ -279,7 +292,10 @@ export async function changeFindingStatusAction(
   const resolutionReason = stringValue(formData, "resolutionReason");
 
   if (!findingId) {
-    return { status: "error", message: "The finding identifier is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the finding. Reopen it from Findings, then try again.",
+    };
   }
 
   const session = await getSessionContext();
@@ -312,7 +328,11 @@ export async function reviewFindingAction(
   const values = readReviewValues(formData);
 
   if (!findingId) {
-    return { status: "error", message: "The finding identifier is missing.", values };
+    return {
+      status: "error",
+      message: "We couldn't identify the finding. Reopen it from Findings, then try again.",
+      values,
+    };
   }
 
   const payload = {
@@ -329,7 +349,7 @@ export async function reviewFindingAction(
   if (!parsed.success) {
     return {
       status: "error",
-      message: "Check the highlighted fields and try again.",
+      message: "A few details need attention. Check the highlighted fields, then try again.",
       fieldErrors: toFieldErrors(parsed.error.issues, REVIEW_FIELDS),
       values,
     };
@@ -361,7 +381,7 @@ export async function confirmDuplicateAction(
   const canonicalFindingId = stringValue(formData, "canonicalFindingId");
 
   if (!findingId || !canonicalFindingId) {
-    return { status: "error", message: "Choose the canonical finding." };
+    return { status: "error", message: "Choose the original finding that this one duplicates." };
   }
 
   const session = await getSessionContext();
@@ -391,7 +411,10 @@ export async function linkEvidenceAction(
   const relationshipType = stringValue(formData, "relationshipType");
 
   if (!findingId || !evidenceId) {
-    return { status: "error", message: "Choose approved evidence." };
+    return {
+      status: "error",
+      message: "Choose evidence that's been approved after redaction review.",
+    };
   }
 
   const session = await getSessionContext();
@@ -419,7 +442,10 @@ export async function removeFindingEvidenceLinkAction(
   const linkId = stringValue(formData, "linkId");
 
   if (!linkId) {
-    return { status: "error", message: "The evidence link is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the evidence link. Reopen the record, then try again.",
+    };
   }
 
   const session = await getSessionContext();

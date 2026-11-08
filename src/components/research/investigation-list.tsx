@@ -28,7 +28,7 @@ export function InvestigationList({
       <EmptyState
         headingLevel={emptyHeadingLevel}
         title={projectId ? "No investigations in this project" : "No investigations yet"}
-        description="An investigation holds a research question, observations, hypotheses, and session notes so work can continue with context."
+        description="Start with a question you'd like to explore. An investigation keeps the clues, ideas, and session notes together so you can resume without retracing every step."
         action={
           canCreate ? (
             <Button asChild variant="outline">

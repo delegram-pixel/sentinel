@@ -39,7 +39,15 @@ async function Content({ params }: { params: Promise<{ engagementId: string }> }
     <div className="page-stack">
       <PageHeader
         title={row.name}
-        description={row.objective ?? "No research objective recorded."}
+        description={
+          <>
+            <p>
+              Keep this round of research on track. Connect targets and scope versions below, then
+              update the engagement status as the work progresses.
+            </p>
+            {row.objective ? <p className="mt-3">{row.objective}</p> : null}
+          </>
+        }
       />
       <ResearchSection id="engagement-context" title="Research context">
         <p>
@@ -68,7 +76,7 @@ async function Content({ params }: { params: Promise<{ engagementId: string }> }
       <ResearchSection
         id="engagement-assets"
         title="Assets and scope versions"
-        description="Associated scope versions retain their own approval and validity. An active engagement does not grant permission to test."
+        description="Check the approval and dates on each connected scope version. Marking this engagement active doesn't grant testing permission."
       >
         {row.assets.length ? (
           <ul>

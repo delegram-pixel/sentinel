@@ -665,7 +665,9 @@ export class PrismaFindingStore implements FindingStore {
     audit: Phase6AuditDraft,
   ): Promise<FindingRow | null> {
     if (findingId === canonicalFindingId) {
-      throw new Error("A finding cannot be a duplicate of itself.");
+      throw new Error(
+        "Choose a different finding as the original. A finding can't duplicate itself.",
+      );
     }
 
     return this.db.$transaction(async (tx) => {

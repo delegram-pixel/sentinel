@@ -26,13 +26,7 @@ export default async function EditInvestigationPage({ params }: EditInvestigatio
   return (
     <FormPage
       title="Edit investigation"
-      description={
-        <>
-          {" "}
-          Update the title, objective, category, or description. The project and target stay fixed
-          so the research trail keeps its context.{" "}
-        </>
-      }
+      description="Sharpen the research question or tidy up the title, category, and description. This investigation stays linked to its original project and target."
       backHref={`/dashboard/investigations/${investigationId}`}
       backLabel="Back to investigation"
     >

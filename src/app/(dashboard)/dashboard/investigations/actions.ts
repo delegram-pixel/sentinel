@@ -160,7 +160,7 @@ function investigationInvalid(
 ): InvestigationFormState {
   return {
     status: "error",
-    message: "Check the highlighted fields and try again.",
+    message: "A few details need attention. Check the highlighted fields, then try again.",
     fieldErrors: toFieldErrors(issues, INVESTIGATION_FIELDS),
     values,
   };
@@ -172,7 +172,7 @@ function observationInvalid(
 ): ObservationFormState {
   return {
     status: "error",
-    message: "Check the highlighted fields and try again.",
+    message: "A few details need attention. Check the highlighted fields, then try again.",
     fieldErrors: toFieldErrors(issues, OBSERVATION_FIELDS),
     values,
   };
@@ -184,7 +184,7 @@ function hypothesisInvalid(
 ): HypothesisFormState {
   return {
     status: "error",
-    message: "Check the highlighted fields and try again.",
+    message: "A few details need attention. Check the highlighted fields, then try again.",
     fieldErrors: toFieldErrors(issues, HYPOTHESIS_FIELDS),
     values,
   };
@@ -196,7 +196,7 @@ function summaryInvalid(
 ): SessionSummaryFormState {
   return {
     status: "error",
-    message: "Check the highlighted fields and try again.",
+    message: "A few details need attention. Check the highlighted fields, then try again.",
     fieldErrors: toFieldErrors(issues, SUMMARY_FIELDS),
     values,
   };
@@ -281,7 +281,8 @@ export async function updateInvestigationAction(
   if (!investigationId) {
     return {
       status: "error",
-      message: "The investigation identifier is missing.",
+      message:
+        "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
       values,
     };
   }
@@ -334,7 +335,11 @@ export async function changeInvestigationStatusAction(
   const status = stringValue(formData, "status");
 
   if (!investigationId || !projectId) {
-    return { status: "error", message: "The investigation identifier is missing." };
+    return {
+      status: "error",
+      message:
+        "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
+    };
   }
 
   const session = await getSessionContext();
@@ -367,7 +372,8 @@ export async function createObservationAction(
   if (!investigationId || !projectId) {
     return {
       status: "error",
-      message: "The investigation identifier is missing.",
+      message:
+        "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
       values,
     };
   }
@@ -413,7 +419,7 @@ export async function updateObservationAction(
   if (!investigationId || !projectId || !observationId) {
     return {
       status: "error",
-      message: "The observation identifier is missing.",
+      message: "We couldn't identify the observation. Reopen its investigation, then try again.",
       values,
     };
   }
@@ -459,7 +465,8 @@ export async function createHypothesisAction(
   if (!investigationId || !projectId) {
     return {
       status: "error",
-      message: "The investigation identifier is missing.",
+      message:
+        "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
       values,
     };
   }
@@ -521,7 +528,7 @@ export async function updateHypothesisAction(
   if (!investigationId || !projectId || !hypothesisId) {
     return {
       status: "error",
-      message: "The hypothesis identifier is missing.",
+      message: "We couldn't identify the hypothesis. Reopen its investigation, then try again.",
       values,
     };
   }
@@ -576,7 +583,10 @@ export async function changeHypothesisStatusAction(
   const status = stringValue(formData, "status");
 
   if (!investigationId || !projectId || !hypothesisId) {
-    return { status: "error", message: "The hypothesis identifier is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the hypothesis. Reopen its investigation, then try again.",
+    };
   }
 
   const session = await getSessionContext();
@@ -610,7 +620,8 @@ export async function createSessionSummaryAction(
   if (!investigationId || !projectId) {
     return {
       status: "error",
-      message: "The investigation identifier is missing.",
+      message:
+        "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
       values,
     };
   }

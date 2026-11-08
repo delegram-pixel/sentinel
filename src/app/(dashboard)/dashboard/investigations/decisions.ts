@@ -35,7 +35,7 @@ export async function recordDecisionAction(
   });
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/dashboard/investigations", "layout");
-  return { status: "success", message: "Research decision recorded." };
+  return { status: "success", message: "Your research decision is saved." };
 }
 export async function changePhaseAction(
   _state: ResearchFormState,
@@ -45,7 +45,7 @@ export async function changePhaseAction(
   const result = await changeResearchPhase(store, actor, Object.fromEntries(data.entries()));
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/dashboard/investigations", "layout");
-  return { status: "success", message: "Research phase updated." };
+  return { status: "success", message: "The research phase is updated." };
 }
 export async function relateInvestigationsAction(
   _state: ResearchFormState,
@@ -55,5 +55,5 @@ export async function relateInvestigationsAction(
   const result = await relateInvestigations(store, actor, Object.fromEntries(data.entries()));
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/dashboard/investigations", "layout");
-  return { status: "success", message: "Relationship recorded." };
+  return { status: "success", message: "The connection is saved." };
 }

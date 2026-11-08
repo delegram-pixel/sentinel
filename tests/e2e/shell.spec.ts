@@ -172,6 +172,31 @@ test.describe("authenticated workspace", () => {
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Findings");
   });
 
+  test("workspace map locates the current section and navigates to a supporting tool", async ({
+    page,
+  }) => {
+    await page.goto("/dashboard/findings");
+    await page.getByRole("button", { name: "Workspace map", exact: true }).click();
+    const map = page.getByRole("dialog", { name: "Workspace map", exact: true });
+    await expect(map).toBeVisible();
+    await expect(map.locator('[aria-current="page"]')).toHaveAttribute(
+      "href",
+      "/dashboard/findings",
+    );
+    await expect(map.locator('[aria-current="page"]')).toContainText("You are here");
+    await map.getByRole("link", { name: /^Evidence/ }).click();
+    await expect(page).toHaveURL(/\/dashboard\/evidence$/);
+    await expect(map).toBeHidden();
+    await page.getByRole("button", { name: "Workspace map", exact: true }).click();
+    await expect(map.locator('[aria-current="page"]')).toHaveAttribute(
+      "href",
+      "/dashboard/evidence",
+    );
+    await page.keyboard.press("Escape");
+    await expect(map).toBeHidden();
+    await expect(page.getByRole("button", { name: "Workspace map", exact: true })).toBeFocused();
+  });
+
   test.describe("mobile navigation", () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
@@ -200,6 +225,23 @@ test.describe("authenticated workspace", () => {
         page.getByRole("heading", { level: 1, name: "Projects", exact: true }),
       ).toBeVisible();
       await expect(drawer).toBeHidden();
+    });
+
+    test("opens the map from the drawer and restores focus after closing", async ({ page }) => {
+      await page.goto("/dashboard/findings");
+      const menu = page.getByRole("button", { name: "Open navigation" });
+      await menu.click();
+      const drawer = page.getByRole("dialog", { name: "Navigation" });
+      await drawer.getByRole("button", { name: "Workspace map", exact: true }).click();
+      const map = page.getByRole("dialog", { name: "Workspace map", exact: true });
+      await expect(drawer).toBeHidden();
+      await expect(map).toBeVisible();
+      await expect(map.getByRole("heading", { name: "Workspace map", exact: true })).toBeFocused();
+      await map.getByRole("link", { name: /^Settings/ }).scrollIntoViewIfNeeded();
+      await expect(map.getByRole("link", { name: /^Settings/ })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(map).toBeHidden();
+      await expect(menu).toBeFocused();
     });
   });
 });

@@ -123,8 +123,8 @@ function AssistanceContext({ investigation }: { investigation: InvestigationDeta
       <div>
         <h2 className="section-title">Assistance for this investigation</h2>
         <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-          Ask a contextual question or run a bounded analysis. AI output remains advisory and needs
-          your review.
+          Ask about the saved research or run a focused analysis. Check any AI suggestions against
+          your evidence before using them.
         </p>
         <Button asChild variant="outline" size="sm" className="mt-4">
           <Link href={`/dashboard/investigations/${investigation.id}/ai`}>Open AI workspace</Link>
@@ -134,7 +134,7 @@ function AssistanceContext({ investigation }: { investigation: InvestigationDeta
         <h3 className="section-title">Current objective</h3>
         <p className="research-copy mt-2 text-sm text-text-secondary">
           {investigation.objective ??
-            "No objective recorded. Add one to keep the research focused."}
+            "What's the question you're exploring? Add an objective to give this investigation a clear direction."}
         </p>
       </div>
       <div className="border-t border-border pt-4">
@@ -155,7 +155,8 @@ function AssistanceContext({ investigation }: { investigation: InvestigationDeta
           </div>
         ) : (
           <p className="mt-2 text-sm text-text-secondary">
-            Save a session summary to keep open questions and next actions here.
+            Leave a session summary with your open questions and next steps. They&apos;ll be waiting
+            here when you return.
           </p>
         )}
       </div>
@@ -187,7 +188,15 @@ export function InvestigationDetailView({
       </Link>
       <PageHeader
         title={investigation.title}
-        description={investigation.description ?? "No investigation description recorded."}
+        description={
+          <>
+            <p>
+              Follow the question from first clue to conclusion. Record observations, connect
+              hypotheses and evidence, and save a session summary so you know where to resume.
+            </p>
+            {investigation.description ? <p className="mt-3">{investigation.description}</p> : null}
+          </>
+        }
         metadata={
           <div className="flex flex-wrap items-center gap-4">
             <InvestigationStatusBadge status={investigation.status} />
@@ -211,8 +220,8 @@ export function InvestigationDetailView({
           <AlertTitle>Research record archived</AlertTitle>
           <AlertDescription>
             {investigation.status === "ARCHIVED"
-              ? "This investigation’s history remains available. It cannot be changed."
-              : "This investigation belongs to an archived project and cannot be changed."}
+              ? "This investigation is archived. You can revisit its history, but editing is closed."
+              : "The project is archived, so this investigation is now read-only. You can still revisit its history."}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -223,7 +232,7 @@ export function InvestigationDetailView({
         <ResearchSection id="objective" title="Research objective">
           <p className="research-copy text-base">
             {investigation.objective ??
-              "No objective recorded yet. Define the question you want this investigation to answer."}
+              "Give this investigation a question to follow. Add an objective to explain what you want to find out."}
           </p>
           {editable ? (
             <Disclosure title="Change investigation status" className="mt-6">
@@ -238,7 +247,7 @@ export function InvestigationDetailView({
         <ResearchSection
           id="observations"
           title="Observations"
-          description="Record what you observed. Keep interpretations and suspected issues in hypotheses."
+          description="Write down what you actually saw and where it came from. Save your explanations and suspected issues for Hypotheses below."
         >
           {editable ? (
             <Disclosure title="Add observation">
@@ -252,7 +261,7 @@ export function InvestigationDetailView({
           {investigation.observations.length === 0 ? (
             <EmptyState
               title="No observations recorded"
-              description="Add the response, behaviour, or result you observed, together with its source."
+              description="Start with a response, behaviour, or result you noticed, and note its source. The first clue doesn't need to solve the whole mystery."
             />
           ) : (
             investigation.observations.map((observation) => (
@@ -300,7 +309,7 @@ export function InvestigationDetailView({
         <ResearchSection
           id="hypotheses"
           title="Hypotheses"
-          description="Track suspected issues, supporting observations, and the information still needed for verification."
+          description="Describe what you think might be happening. Connect the observations that support or challenge it, and note what you'd need to verify the idea."
         >
           {editable ? (
             <Disclosure title="Add hypothesis">
@@ -315,7 +324,7 @@ export function InvestigationDetailView({
           {investigation.hypotheses.length === 0 ? (
             <EmptyState
               title="No hypotheses recorded"
-              description="State a suspected issue and connect the observations that support or contradict it."
+              description="Have a possible explanation? Add a hypothesis and connect the observations that support or challenge it."
             />
           ) : (
             investigation.hypotheses.map((hypothesis) => (
@@ -410,7 +419,7 @@ export function InvestigationDetailView({
         <ResearchSection
           id="findings"
           title="Findings"
-          description="Candidate vulnerabilities recorded from this investigation. Only a human reviewer can confirm or mark a finding reportable."
+          description="Capture suspected vulnerabilities from this research. A human reviewer must verify a finding before it's confirmed or marked reportable."
           action={
             editable ? (
               <div className="flex flex-wrap items-center gap-2">
@@ -431,7 +440,7 @@ export function InvestigationDetailView({
           {findings.length === 0 ? (
             <EmptyState
               title="No findings recorded"
-              description="Create a finding when observations and evidence support a candidate vulnerability."
+              description="When your observations and evidence point to a possible vulnerability, create a finding and explain the case for review."
             />
           ) : (
             findings.map((finding) => (
@@ -456,7 +465,7 @@ export function InvestigationDetailView({
         <ResearchSection
           id="evidence-references"
           title="Evidence"
-          description="Private evidence for this investigation. Files stay quarantined until a human reviewer resolves redaction."
+          description="Keep supporting files with this investigation. They'll stay in private quarantine until a human reviewer resolves redaction."
           action={
             editable ? (
               <Button asChild variant="outline" size="sm">
@@ -470,7 +479,7 @@ export function InvestigationDetailView({
           {evidence.length === 0 ? (
             <EmptyState
               title="No evidence uploaded"
-              description="Upload screenshots, request/response captures, logs, or documents to support findings."
+              description="Add a screenshot, request or response capture, log, or document that helps someone follow the research."
             />
           ) : (
             evidence.map((item) => (
@@ -495,7 +504,7 @@ export function InvestigationDetailView({
         <ResearchSection
           id="session-summaries"
           title="Session history"
-          description="Completed work, unresolved questions, and saved next actions for the next research session."
+          description="Before you leave, note what changed, what's still unclear, and what to try next. Consider it a bookmark for your brain."
         >
           {editable ? (
             <Disclosure title="Record session summary">
@@ -505,7 +514,7 @@ export function InvestigationDetailView({
           {investigation.summaries.length === 0 ? (
             <EmptyState
               title="No session summaries recorded"
-              description="Save what changed in this session and what still needs attention."
+              description="Save a quick summary of this session and the questions you want to come back to."
             />
           ) : (
             investigation.summaries.map((summary) => (

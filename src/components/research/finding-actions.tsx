@@ -105,8 +105,8 @@ export function FindingStatusForm({
     return (
       <p className="text-sm text-text-secondary">
         {currentStatus === "UNDER_REVIEW"
-          ? "Record a human verification review to confirm, reject, or close this finding."
-          : "No direct status transition is available from the current state."}
+          ? "Use the verification review to record a human decision to confirm, reject, or close this finding."
+          : "There isn't a direct status change available at this stage. Check the finding's review history for context."}
       </p>
     );
   }
@@ -135,7 +135,7 @@ export function FindingStatusForm({
                 name="rationale"
                 required
                 maxLength={8000}
-                placeholder="Explain the human decision and its supporting review or retest."
+                placeholder="What did you decide, and which review or retest supports it?"
               />
             </Field>
           ) : null}
@@ -254,9 +254,9 @@ export function SeverityAssessmentForm({
               htmlFor="finding-severity-rationale"
               help={{
                 description:
-                  "Explain why the chosen severity fits the demonstrated impact, affected asset, required conditions, and limitations of the evidence.",
+                  "Explain why this severity fits what you've demonstrated. Include the affected asset, required conditions, and any limits in the evidence.",
                 example:
-                  "Describe the sensitivity of the exposed information and the prerequisites for access, rather than relying only on the vulnerability category.",
+                  "If information was exposed, explain how sensitive it is and what access was needed. That gives reviewers more to work with than the category alone.",
               }}
             >
               Severity rationale
@@ -267,7 +267,7 @@ export function SeverityAssessmentForm({
               defaultValue={state.values.severityRationale}
               {...errorAttributes("severityRationale")}
               className="min-h-24"
-              placeholder="Why this severity, based on impact and exploitability."
+              placeholder="Why does this severity fit the impact and the conditions needed to exploit it?"
             />
             {errorFor("severityRationale")}
           </Field>
@@ -326,10 +326,10 @@ export function VerificationReviewForm({
               htmlFor="review-conclusion"
               help={{
                 description:
-                  "Record the reviewer's decision based on supporting, contradictory, and missing evidence. Confirmation requires the existing readiness checks to pass.",
+                  "Record your decision using the evidence that supports or challenges the claim, and note what's missing. Confirmation still needs all readiness checks to pass.",
                 example:
-                  "Choose Needs more evidence when the observation is plausible but the affected asset or impact has not been established.",
-                note: "Only an authorized human reviewer can confirm, reject, or mark a finding as a false positive. AI advice is not a verification decision.",
+                  "Choose Needs more evidence if the observation looks plausible but the affected asset or impact is still unclear.",
+                note: "An authorized human reviewer must make the decision to confirm, reject, or mark a false positive. AI advice can help with the review, but can't make that decision.",
               }}
             >
               Human conclusion
@@ -461,8 +461,8 @@ export function DuplicateConfirmationForm({
   if (candidates.length === 0) {
     return (
       <p className="text-sm text-text-secondary">
-        No similar findings were detected in this investigation. Duplicate detection is advisory; a
-        reviewer still makes the final call.
+        No similar findings showed up in this investigation. The check is a guide; a reviewer still
+        decides whether two findings are duplicates.
       </p>
     );
   }
@@ -473,7 +473,7 @@ export function DuplicateConfirmationForm({
         <input type="hidden" name="findingId" value={findingId} />
         <input type="hidden" name="investigationId" value={investigationId} />
         <Field>
-          <FieldLabel htmlFor="duplicate-canonical">Canonical finding</FieldLabel>
+          <FieldLabel htmlFor="duplicate-canonical">Original finding</FieldLabel>
           <Select id="duplicate-canonical" name="canonicalFindingId" defaultValue="">
             <option value="">Choose a finding</option>
             {candidates.map((candidate) => (
@@ -513,8 +513,8 @@ export function EvidenceLinkForm({
   if (evidence.length === 0) {
     return (
       <p className="text-sm text-text-secondary">
-        No approved evidence is available yet. Upload evidence and have a reviewer resolve redaction
-        first.
+        There&apos;s no approved evidence to choose yet. Upload a file and ask a reviewer to
+        complete its redaction review first.
       </p>
     );
   }
@@ -541,10 +541,10 @@ export function EvidenceLinkForm({
               htmlFor="link-relationship"
               help={{
                 description:
-                  "Explain how the linked evidence relates to the finding. Supporting material backs the claim; contradicting material challenges it; contextual material adds background.",
+                  "Say how the evidence relates to the finding. Choose Support if it backs the claim, Contradiction if it challenges it, or Context if it adds background.",
                 example:
-                  "Link a reproduced response as support and a response that rules out an assumed condition as contradictory evidence.",
-                note: "Approved findings must retain supporting evidence; removing the last supporting link is blocked.",
+                  "A reproduced response can support the claim. A response that rules out an assumption can challenge it.",
+                note: "Approved findings need to keep supporting evidence. You can't remove their last supporting link.",
               }}
             >
               Relationship

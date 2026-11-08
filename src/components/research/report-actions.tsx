@@ -132,7 +132,8 @@ export function ReportRevisionForm({
             {pending ? "Saving…" : `Save revision ${version + 1}`}
           </Button>
           <span className="text-xs text-text-secondary">
-            Saving creates an immutable revision. Earlier revisions are kept.
+            Each save creates a new revision. Earlier versions stay in the history so you can
+            revisit them.
           </span>
         </div>
       </FieldGroup>

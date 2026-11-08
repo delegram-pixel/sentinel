@@ -12,7 +12,7 @@ export default function NotFound() {
       <p className="font-mono text-xs text-text-secondary">404</p>
       <PageHeader
         title="This page is unavailable"
-        description="The address may be incorrect, or this research record may not be available in your workspace."
+        description="We can't find this page in your workspace. Check the address, or head back to the dashboard to choose a record you can open."
       />
       <Button asChild variant="outline" className="self-start">
         <Link href="/dashboard">Back to dashboard</Link>

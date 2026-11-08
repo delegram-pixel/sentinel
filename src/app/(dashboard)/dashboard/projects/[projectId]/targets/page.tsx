@@ -56,7 +56,7 @@ async function ProjectTargetsContent({ projectId }: { projectId: string }) {
       </Link>
       <PageHeader
         title="Targets"
-        description={`Assets registered for ${project.name}. Each target has its own authorization context and scope history.`}
+        description={`Manage the assets you're researching in ${project.name}. Open a target to check its permission and scope history, or register another asset when you're ready.`}
         metadata={<ProjectStatusBadge status={project.status} />}
         actions={
           project.status !== "ARCHIVED" ? (

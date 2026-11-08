@@ -42,7 +42,7 @@ async function FindingsContent({ searchParams }: FindingsPageProps) {
     <div className="page-stack">
       <PageHeader
         title="Findings"
-        description="Candidate vulnerabilities, supporting evidence, and human verification decisions. Review the research before confirming a finding."
+        description="Turn a promising lead into a finding you can stand behind. Open a record to review its evidence and verification history; a human reviewer decides whether it's confirmed."
         actions={
           investigationId ? (
             <Button asChild>

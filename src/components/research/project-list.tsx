@@ -14,7 +14,7 @@ export function ProjectList({ projects }: { projects: ProjectListRow[] }) {
       <EmptyState
         headingLevel={2}
         title="No projects yet"
-        description="Create a project to group the targets, scope, and investigations for one piece of research."
+        description="Start a project for the research you'd like to explore. Add targets, define their scope, and keep the investigations together. A small first project is a perfectly good start."
         action={
           <Button asChild>
             <Link href="/dashboard/projects/new">Create the first project</Link>

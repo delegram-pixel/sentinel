@@ -44,22 +44,31 @@ async function loadEditableInvestigation(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
   const project = await projectStore.findProjectLookup(workspaceId, investigation.projectId);
 
   if (!project) {
-    return failure("PROJECT_NOT_FOUND", "That project does not exist in this workspace.");
+    return failure(
+      "PROJECT_NOT_FOUND",
+      "We can't find that project in this workspace. Open Projects to choose an available one.",
+    );
   }
 
   if (project.status === "ARCHIVED") {
-    return failure("PROJECT_ARCHIVED", "Investigations in an archived project cannot be changed.");
+    return failure(
+      "PROJECT_ARCHIVED",
+      "This project's research is archived, so its investigations are read-only.",
+    );
   }
 
   if (!canEditInvestigation(investigation.status)) {
-    return failure("INVESTIGATION_ARCHIVED", "An archived investigation cannot be changed.");
+    return failure(
+      "INVESTIGATION_ARCHIVED",
+      "This investigation is archived. You can revisit its history, but editing is closed.",
+    );
   }
 
   return { ok: true, value: investigation };
@@ -98,17 +107,26 @@ export async function createInvestigation(
   const project = await projectStore.findProjectLookup(actor.workspaceId, projectId);
 
   if (!project) {
-    return failure("PROJECT_NOT_FOUND", "That project does not exist in this workspace.");
+    return failure(
+      "PROJECT_NOT_FOUND",
+      "We can't find that project in this workspace. Open Projects to choose an available one.",
+    );
   }
 
   if (project.status === "ARCHIVED") {
-    return failure("PROJECT_ARCHIVED", "Investigations cannot be added to an archived project.");
+    return failure(
+      "PROJECT_ARCHIVED",
+      "This project is archived. Choose an active project for the new investigation.",
+    );
   }
 
   const target = await targetStore.findTargetLookup(actor.workspaceId, parsed.data.targetId);
 
   if (!target || target.projectId !== projectId) {
-    return failure("TARGET_NOT_FOUND", "That target does not exist in this project.");
+    return failure(
+      "TARGET_NOT_FOUND",
+      "We can't find that target in this project. Choose one from the project's Targets page.",
+    );
   }
 
   const investigation = await store.createInvestigation(
@@ -197,7 +215,7 @@ export async function updateInvestigation(
   if (!updated) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -223,22 +241,31 @@ export async function changeInvestigationStatus(
   if (!existing) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
   const project = await projectStore.findProjectLookup(actor.workspaceId, existing.projectId);
 
   if (!project) {
-    return failure("PROJECT_NOT_FOUND", "That project does not exist in this workspace.");
+    return failure(
+      "PROJECT_NOT_FOUND",
+      "We can't find that project in this workspace. Open Projects to choose an available one.",
+    );
   }
 
   if (project.status === "ARCHIVED") {
-    return failure("PROJECT_ARCHIVED", "Investigations in an archived project cannot be changed.");
+    return failure(
+      "PROJECT_ARCHIVED",
+      "This project's research is archived, so its investigations are read-only.",
+    );
   }
 
   if (existing.status === "ARCHIVED") {
-    return failure("INVESTIGATION_ARCHIVED", "An archived investigation cannot be changed.");
+    return failure(
+      "INVESTIGATION_ARCHIVED",
+      "This investigation is archived. You can revisit its history, but editing is closed.",
+    );
   }
 
   if (!canTransitionInvestigation(existing.status, parsed.data)) {
@@ -266,7 +293,7 @@ export async function changeInvestigationStatus(
   if (!updated) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -356,7 +383,7 @@ export async function updateObservation(
   if (!existing) {
     return failure(
       "OBSERVATION_NOT_FOUND",
-      "That observation does not exist in this investigation.",
+      "We can't find that observation in this investigation. Reopen its observations to choose an available one.",
     );
   }
 
@@ -392,7 +419,7 @@ export async function updateObservation(
   if (!updated) {
     return failure(
       "OBSERVATION_NOT_FOUND",
-      "That observation does not exist in this investigation.",
+      "We can't find that observation in this investigation. Reopen its observations to choose an available one.",
     );
   }
 
@@ -431,7 +458,7 @@ export async function createHypothesis(
   ) {
     return failure(
       "OBSERVATION_NOT_FOUND",
-      "One of the selected observations does not belong to this investigation.",
+      "One selected observation is from a different investigation. Choose observations from this investigation to continue.",
     );
   }
 
@@ -490,7 +517,10 @@ export async function updateHypothesis(
   const existing = loaded.value.hypotheses.find((hypothesis) => hypothesis.id === hypothesisId);
 
   if (!existing) {
-    return failure("HYPOTHESIS_NOT_FOUND", "That hypothesis does not exist in this investigation.");
+    return failure(
+      "HYPOTHESIS_NOT_FOUND",
+      "We can't find that hypothesis in this investigation. Reopen its hypotheses to choose an available one.",
+    );
   }
 
   const updated = await store.updateHypothesis(
@@ -522,7 +552,10 @@ export async function updateHypothesis(
   );
 
   if (!updated) {
-    return failure("HYPOTHESIS_NOT_FOUND", "That hypothesis does not exist in this investigation.");
+    return failure(
+      "HYPOTHESIS_NOT_FOUND",
+      "We can't find that hypothesis in this investigation. Reopen its hypotheses to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };
@@ -556,7 +589,10 @@ export async function changeHypothesisStatus(
   const existing = loaded.value.hypotheses.find((hypothesis) => hypothesis.id === hypothesisId);
 
   if (!existing) {
-    return failure("HYPOTHESIS_NOT_FOUND", "That hypothesis does not exist in this investigation.");
+    return failure(
+      "HYPOTHESIS_NOT_FOUND",
+      "We can't find that hypothesis in this investigation. Reopen its hypotheses to choose an available one.",
+    );
   }
 
   const transition = transitionHypothesis(existing.status, parsed.data, "RESEARCHER");
@@ -581,7 +617,10 @@ export async function changeHypothesisStatus(
   );
 
   if (!updated) {
-    return failure("HYPOTHESIS_NOT_FOUND", "That hypothesis does not exist in this investigation.");
+    return failure(
+      "HYPOTHESIS_NOT_FOUND",
+      "We can't find that hypothesis in this investigation. Reopen its hypotheses to choose an available one.",
+    );
   }
 
   return { ok: true, value: { id: updated.id } };

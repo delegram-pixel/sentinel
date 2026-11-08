@@ -17,7 +17,7 @@ export default function TargetsPage() {
     <div className="page-stack">
       <PageHeader
         title="Targets"
-        description="Registered assets, their authorization, and the scope that defines research boundaries."
+        description="See which assets belong to your research and what you're allowed to test. Open a target to check its permission and scope, or browse projects to register a new one."
         actions={
           <Button asChild variant="outline">
             <Link href="/dashboard/projects">Browse projects</Link>

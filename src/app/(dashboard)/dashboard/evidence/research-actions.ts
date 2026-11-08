@@ -27,7 +27,8 @@ export async function reviewReplacementAction(
   revalidatePath("/dashboard/evidence", "layout");
   return {
     status: "success",
-    message: "Reviewed replacement recorded. The original evidence remains retained.",
+    message:
+      "The reviewed replacement is saved. The original evidence is still kept in the history.",
   };
 }
 export async function recordProvenanceAction(
@@ -38,7 +39,7 @@ export async function recordProvenanceAction(
   const result = await recordEvidenceProvenance(store, actor, Object.fromEntries(form.entries()));
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/dashboard/evidence", "layout");
-  return { status: "success", message: "Collection provenance recorded." };
+  return { status: "success", message: "Saved where and how this evidence was collected." };
 }
 export async function relateEvidenceResearchAction(
   _state: ResearchFormState,
@@ -53,7 +54,7 @@ export async function relateEvidenceResearchAction(
   });
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/dashboard/evidence", "layout");
-  return { status: "success", message: "Evidence relationship recorded." };
+  return { status: "success", message: "The evidence connection is saved." };
 }
 export async function reviewAssessmentAction(
   _state: ResearchFormState,
@@ -63,5 +64,5 @@ export async function reviewAssessmentAction(
   const result = await reviewEvidenceAssessment(store, actor, Object.fromEntries(form.entries()));
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/dashboard/evidence", "layout");
-  return { status: "success", message: "Assessment review recorded." };
+  return { status: "success", message: "Your assessment review is saved." };
 }

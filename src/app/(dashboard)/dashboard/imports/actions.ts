@@ -20,11 +20,18 @@ export async function createImportAction(
   let fileName = String(data.get("fileName") ?? "supplied-results");
   if (file instanceof File && file.size) {
     if (file.size > IMPORT_MAX_BYTES)
-      return { status: "error", message: "Use a file smaller than 500 KB." };
+      return {
+        status: "error",
+        message: "This export is too large. Choose a file smaller than 500 KB.",
+      };
     try {
       rawContent = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
     } catch {
-      return { status: "error", message: "Supply a valid UTF-8 file." };
+      return {
+        status: "error",
+        message:
+          "We couldn't read this file as UTF-8 text. Save the export in UTF-8, then upload it again.",
+      };
     }
     fileName = file.name;
   }
@@ -33,7 +40,11 @@ export async function createImportAction(
     const mapping = String(data.get("fieldMapping") ?? "").trim();
     if (mapping) fieldMapping = JSON.parse(mapping);
   } catch {
-    return { status: "error", message: "Field mapping must be a JSON object." };
+    return {
+      status: "error",
+      message:
+        "Enter the field mapping as a JSON object. The example beside the field shows the format.",
+    };
   }
   const result = await requestToolImport(
     new PrismaImportStore(getDb()),
@@ -63,5 +74,9 @@ export async function reviewImportAction(
   revalidatePath("/dashboard/imports", "layout");
   revalidatePath("/dashboard/findings");
   revalidatePath("/dashboard/investigations");
-  return { status: "success", message: "Review recorded. Adopted research remains a draft." };
+  return {
+    status: "success",
+    message:
+      "Your review is saved. Any adopted observations or findings stay in Draft for further review.",
+  };
 }

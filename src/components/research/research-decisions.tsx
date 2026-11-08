@@ -25,7 +25,7 @@ export function ResearchDecisions({
     <ResearchSection
       id="research-decisions"
       title="Research decisions"
-      description="Attributable decisions preserve the rationale and sources behind the investigation."
+      description="Record what you decided, why, and which sources informed it. That helps someone else follow the reasoning later."
     >
       <p className="mb-4 text-sm">Research phase: {phase.replaceAll("_", " ")}</p>
       {canEdit && phase !== "CLOSED" ? (

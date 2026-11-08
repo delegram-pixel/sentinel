@@ -13,13 +13,7 @@ export default function NewProjectPage() {
   return (
     <FormPage
       title="New project"
-      description={
-        <>
-          {" "}
-          A project is the container for one piece of research. You can register targets and draft
-          scope after it exists.{" "}
-        </>
-      }
+      description="Give your research a name and a purpose. Create the project first, then add targets, define their scope, and start exploring your questions."
       backHref="/dashboard/projects"
       backLabel="All projects"
     >

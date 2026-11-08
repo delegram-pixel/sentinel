@@ -12,7 +12,7 @@ export default function EngagementsPage() {
     <div className="page-stack">
       <PageHeader
         title="Engagements"
-        description="Research objectives, associated assets and scope history."
+        description="Give each round of research a plan. Create an engagement, then connect its targets and scope versions. Even rabbit holes benefit from a little structure."
         actions={
           <Button asChild>
             <Link href="/dashboard/engagements/new">New engagement</Link>
@@ -48,7 +48,10 @@ async function Content() {
           ))}
         </ul>
       ) : (
-        <p>No engagements yet. Create one for an existing project and associate its targets.</p>
+        <p>
+          Start an engagement for an existing project, then connect the targets for this round of
+          research.
+        </p>
       )}
     </ResearchSection>
   );

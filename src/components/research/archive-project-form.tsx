@@ -21,8 +21,8 @@ export function ArchiveProjectForm({ projectId }: { projectId: string }) {
     <Disclosure title="Archive project">
       <Alert variant="warning">
         <AlertDescription>
-          Archiving preserves the research history and prevents further edits, new targets, or
-          investigations. This cannot be undone from the workspace.
+          Ready to put this project away? Archiving keeps its history and closes editing, new
+          targets, and new investigations. You can&apos;t undo this from the workspace.
         </AlertDescription>
       </Alert>
       <form

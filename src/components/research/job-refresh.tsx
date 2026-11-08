@@ -11,7 +11,9 @@ export function JobRefresh({ active }: { active: boolean }) {
   }, [active, router]);
   return active ? (
     <p role="status" className="text-sm text-muted-foreground">
-      {pending ? "Updating work status…" : "Work status updates every 10 seconds."}
+      {pending
+        ? "Updating work status…"
+        : "Status refreshes every 10 seconds while work is queued or running."}
     </p>
   ) : null;
 }

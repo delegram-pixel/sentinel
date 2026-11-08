@@ -10,7 +10,7 @@ export default function InsightsPage() {
     <div className="page-stack">
       <PageHeader
         title="Research insights"
-        description="Current workspace records, review coverage and documented outcomes."
+        description="Take a step back and see how the research is going. Check the counts below to spot findings awaiting review, evidence needing attention, and progress on fixes."
       />
       <Suspense fallback={<p>Loading insights…</p>}>
         <Content />

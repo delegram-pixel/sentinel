@@ -128,13 +128,7 @@ export function TargetForm(props: TargetFormProps) {
       <ResearchSection
         id="form-asset"
         title="Asset"
-        description={
-          <>
-            {" "}
-            Identify the exact asset and the environment it belongs to. The asset identifier must be
-            unique inside {props.project.name}.{" "}
-          </>
-        }
+        description={`Name the asset and tell us which environment it belongs to. Use an identifier that isn't already registered in ${props.project.name}.`}
       >
         <FieldGroup>
           <Field data-invalid={Boolean(state.fieldErrors?.name)}>
@@ -158,10 +152,10 @@ export function TargetForm(props: TargetFormProps) {
               htmlFor="asset-identifier"
               help={{
                 description:
-                  "Identify the actual asset you are researching. Match the identifier format to the selected asset type and use the same identity when defining scope.",
+                  "Enter the exact asset you want to research, using the format for its asset type. Use that same identifier when you define its scope.",
                 example:
-                  "For a domain target, enter lab.example.test. For a URL target, enter the complete permitted URL.",
-                note: "Adding the asset records it; it does not grant authorization.",
+                  "For a domain, use lab.example.test. For a URL, paste the full URL covered by your permission.",
+                note: "Adding the asset saves its details. You'll still need to record permission and activate a scope before testing.",
               }}
             >
               Asset identifier
@@ -179,7 +173,7 @@ export function TargetForm(props: TargetFormProps) {
               aria-describedby={describedBy("assetIdentifier", state, true)}
             />
             <p id="target-assetIdentifier-hint" className="text-xs text-muted-foreground">
-              Only use assets you own or are explicitly authorized to test.
+              Choose an asset you own or have explicit permission to test.
             </p>
             <FieldError field="assetIdentifier" state={state} />
           </Field>
@@ -208,9 +202,8 @@ export function TargetForm(props: TargetFormProps) {
                 htmlFor="environment-type"
                 help={{
                   description:
-                    "Record whether this is a practice lab, staging system, production asset, or another environment. This helps reviewers interpret observations and their impact.",
-                  example:
-                    "Use Practice lab for an isolated training application rather than a production service.",
+                    "Tell reviewers whether this is a practice lab, staging, production, or another environment. That context helps them judge what an observation means.",
+                  example: "For an isolated training app, choose Practice lab.",
                 }}
               >
                 Environment
@@ -255,8 +248,8 @@ export function TargetForm(props: TargetFormProps) {
         description={
           <>
             {" "}
-            Record where the permission comes from. This does not activate scope: scope versions are
-            created and approved separately.{" "}
+            Note where your permission comes from. After saving the target, create and approve its
+            scope separately before testing.{" "}
           </>
         }
       >
@@ -299,10 +292,10 @@ export function TargetForm(props: TargetFormProps) {
                 htmlFor="authorization-source"
                 help={{
                   description:
-                    "Identify the document, programme terms, or owner permission that establishes your right to research the target.",
+                    "Point to the agreement, programme terms, or owner's permission that lets you research this target.",
                   example:
-                    "Reference the approved assessment agreement or a lab that you own, then document the allowed boundaries in scope.",
-                  note: "This background is separate from the active ScopeVersion that the platform enforces.",
+                    "Reference your assessment agreement or the lab you own, then use the scope to spell out the allowed boundaries.",
+                  note: "This records the background. The active scope version is what the app checks when you take an action.",
                 }}
               >
                 Authorization source

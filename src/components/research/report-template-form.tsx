@@ -58,9 +58,8 @@ export function ReportTemplateForm() {
         <FieldSet>
           <FieldLegend>Template sections</FieldLegend>
           <FieldDescription>
-            Required sections are always included so reports keep findings, evidence, assumptions,
-            and missing information separate. Add optional methodology or recommendations sections
-            when the report needs them.
+            The required sections keep findings, evidence, assumptions, and missing information
+            clear. Add Methodology or Recommendations if they&apos;d help your reader.
           </FieldDescription>
           <div className="mt-3 flex flex-col gap-2">
             {REPORT_TEMPLATE_SECTION_OPTIONS.map((section) => (

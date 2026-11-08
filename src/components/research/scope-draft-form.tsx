@@ -136,12 +136,14 @@ export function ScopeDraftForm({
         title="Effective window"
         help={{
           description:
-            "Define the period during which the scope may authorize platform capabilities. A draft or a scope outside its effective window is not an active authorization.",
+            "Set when the permission starts and ends. The scope must be active and within these dates before it can allow an action.",
           example:
-            "Use the start and end times from the assessment agreement, and review them before activation.",
-          note: "Saving this form creates a draft. Approval and activation are separate steps.",
+            "Copy the dates and times from your agreement, then double-check them before activation.",
+          note: "Saving creates a draft. You'll need to review and activate it before testing.",
         }}
-        description={<> The draft only permits action inside this window, once it is activated. </>}
+        description={
+          <>After activation, this scope only allows actions during the dates you set here.</>
+        }
       >
         <FieldGroup className="grid sm:grid-cols-2">
           <Field data-invalid={Boolean(state.fieldErrors?.effectiveFrom)}>
@@ -179,7 +181,7 @@ export function ScopeDraftForm({
         id="form-assets"
         title="Assets"
         description={
-          <> At least one allowed asset is required. Excluded assets act as explicit exclusions. </>
+          <>Add at least one allowed asset. List exclusions too, so the boundaries are clear.</>
         }
         action={
           <Button type="button" variant="outline" size="sm" onClick={addRow}>
@@ -231,10 +233,10 @@ export function ScopeDraftForm({
                     htmlFor={`match-type-${row.id}`}
                     help={{
                       description:
-                        "Choose how this rule compares an asset to its identifier. Exact matching targets one identity; broader patterns can include more assets.",
+                        "Choose how the rule matches an asset. Exact matches one identifier; broader patterns may include additional assets, so check the boundaries carefully.",
                       example:
-                        "Use an exact rule for one specified URL. Use a domain rule only when that domain is included in the authorization.",
-                      note: "Check the rule's actual meaning before activation; avoid granting a broader boundary than the permission allows.",
+                        "Use Exact for one specific URL. Use a domain rule only if your permission covers that domain.",
+                      note: "Check what the rule will match before activation. It must stay within the permission you've been given.",
                     }}
                   >
                     Match type
@@ -258,9 +260,9 @@ export function ScopeDraftForm({
                     htmlFor={`effect-${row.id}`}
                     help={{
                       description:
-                        "Mark the asset rule as allowed or excluded. Exclusions narrow the permitted boundary and take precedence over a matching allow rule.",
+                        "Choose whether this rule allows or excludes an asset. If both rules match, the exclusion wins.",
                       example:
-                        "Allow the assessment domain and explicitly exclude a third-party asset that the agreement does not cover.",
+                        "Allow the assessment domain, then exclude any third-party asset your agreement doesn't cover.",
                     }}
                   >
                     Effect
@@ -315,18 +317,12 @@ export function ScopeDraftForm({
         title="Permitted activities"
         help={{
           description:
-            "Explicitly permit only the capabilities covered by the authorization. Missing or prohibited permissions cannot be inferred from the target name, project type, or engagement status.",
+            "Select only the actions your permission covers. An action needs explicit permission here; the target name, project type, or engagement status can't supply it.",
           example:
-            "Permit reading supplied research context when authorized, and review the description of each capability before selecting it.",
-          note: "Scope permission does not enable an unimplemented capability or autonomous security testing.",
+            "Read each action's description before selecting it. For example, permit reading saved research context if your authorization covers it.",
+          note: "A scope only permits actions the app supports. It doesn't add new tools or enable autonomous testing.",
         }}
-        description={
-          <>
-            {" "}
-            Select the actions this scope permits for {targetName}. The capability gate still
-            applies at action time.{" "}
-          </>
-        }
+        description={`Choose the actions your permission covers for ${targetName}. The app checks these permissions whenever an action runs.`}
       >
         <FieldGroup>
           {CAPABILITIES.map((capability) => {
@@ -365,7 +361,10 @@ export function ScopeDraftForm({
         id="form-draft-notes"
         title="Draft notes"
         description={
-          <> Optional context for the reviewer. Activation requires a separate attestation. </>
+          <>
+            Add any background the reviewer should know. You&apos;ll confirm the permission
+            separately when activating this scope.
+          </>
         }
       >
         <FieldGroup>

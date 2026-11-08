@@ -118,10 +118,14 @@ export function ChatForm({
         setMessage("");
         operation.current = null;
       } else if (!failed) {
-        setError("The stream ended before completion. Check task history or retry this question.");
+        setError(
+          "The reply stopped before it finished. Check task history to see what was saved, or try the question again.",
+        );
       }
     } catch {
-      setError("The chat request could not be completed.");
+      setError(
+        "We couldn't finish this reply. Check task history and try again when you're ready.",
+      );
     } finally {
       setPending(false);
       router.refresh();
@@ -150,8 +154,8 @@ export function ChatForm({
             aria-describedby={`${id}-hint`}
           />
           <FieldDescription id={`${id}-hint`}>
-            The assistant uses saved investigation context. Review its interpretation before
-            recording a conclusion.
+            The assistant uses your saved research. Check its interpretation against the evidence
+            before recording a conclusion.
           </FieldDescription>
         </Field>
         <div className="flex flex-wrap items-center gap-4">
@@ -162,7 +166,9 @@ export function ChatForm({
             {pending ? "Analysing…" : "Ask assistant"}
           </Button>
           <span role="status" className="text-xs text-text-secondary">
-            {pending ? "Analysis is running. Your question has been sent." : ""}
+            {pending
+              ? "Your question is sent. The assistant is working through the saved context."
+              : ""}
           </span>
         </div>
       </FieldGroup>

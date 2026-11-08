@@ -47,7 +47,7 @@ async function NewReportContent({ searchParams }: NewReportPageProps) {
     return (
       <FormPage
         title="New report"
-        description="Choose an investigation with at least one confirmed or reportable finding."
+        description="Start with an investigation below that has a confirmed or reportable finding. You'll choose what to include and create a draft you can review before sharing."
         backHref="/dashboard/reports"
         backLabel="Back to reports"
       >
@@ -80,7 +80,7 @@ async function NewReportContent({ searchParams }: NewReportPageProps) {
         ) : (
           <EmptyState
             title="No reportable investigations"
-            description="Confirm a finding through the human verification workflow before creating a report."
+            description="Ask a human reviewer to verify a finding first. Once it's confirmed or reportable, you can create a report from the investigation."
             action={
               <Link href="/dashboard/investigations" className="record-link">
                 Open investigations
@@ -108,7 +108,7 @@ async function NewReportContent({ searchParams }: NewReportPageProps) {
   return (
     <FormPage
       title="New report"
-      description={`Create a draft from confirmed findings in ${investigation.investigationTitle}.`}
+      description={`Build a write-up for ${investigation.investigationTitle}. Choose the confirmed findings and a template, then create a draft to edit and send for review.`}
       backHref={`/dashboard/investigations/${investigation.id}`}
       backLabel="Back to investigation"
     >
@@ -130,7 +130,7 @@ async function NewReportContent({ searchParams }: NewReportPageProps) {
       ) : (
         <EmptyState
           title="No eligible findings"
-          description="A human reviewer must confirm a finding before it can be included in a report."
+          description="Have a human reviewer confirm or mark a finding reportable first, then include it in the report."
           action={
             <Link href={`/dashboard/investigations/${investigation.id}`} className="record-link">
               Review investigation findings

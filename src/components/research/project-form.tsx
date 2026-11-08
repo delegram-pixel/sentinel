@@ -84,8 +84,8 @@ export function ProjectForm(props: ProjectFormProps) {
         description={
           <>
             {" "}
-            The name and description are shown in the workspace. The project type sets expectations
-            for how targets should be authorised.{" "}
+            Choose a name you&apos;ll recognise and a description that explains the plan. The
+            project type tells reviewers what setting you&apos;re working in.{" "}
           </>
         }
       >
@@ -115,10 +115,10 @@ export function ProjectForm(props: ProjectFormProps) {
               htmlFor="project-type"
               help={{
                 description:
-                  "Describe the setting for this work so the project has the right research context. This classification does not grant testing permission.",
+                  "Choose the setting that best fits the work. It helps reviewers understand the project; testing permission still comes from each target's scope.",
                 example:
-                  "Choose Learning lab for an isolated practice application; use the appropriate assessment type for explicitly authorized work.",
-                note: "Each target still needs its own approved, active scope.",
+                  "Use Learning lab for an isolated practice app. For an authorized assessment, choose the type that matches the agreement.",
+                note: "Before testing, check that each target has its own approved, active scope.",
               }}
             >
               Project type
@@ -148,9 +148,9 @@ export function ProjectForm(props: ProjectFormProps) {
               htmlFor="project-description"
               help={{
                 description:
-                  "Explain the purpose of the project, its intended research boundaries, and useful background for someone reviewing it later.",
+                  "Say what you're researching, where the boundaries are, and what someone picking this up later should know.",
                 example:
-                  "Review access control in a local practice application using supplied request/response captures.",
+                  "Explore access control in a local practice app using saved request and response captures.",
               }}
             >
               Description
@@ -171,7 +171,7 @@ export function ProjectForm(props: ProjectFormProps) {
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Optional. Do not include secrets or personal data.
+                Add background if it&apos;s useful. Leave out secrets and personal data.
               </p>
             )}
           </Field>

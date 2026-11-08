@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { InvestigationStatusBadge } from "@/components/research/investigation-badges";
+import { WorkspaceMapEntry } from "@/components/onboarding/workspace-map-provider";
 import { RedactionStatusBadge } from "@/components/research/phase6-badges";
 import { EvidenceReference } from "@/components/shared/evidence-reference";
 import { ResearchTime } from "@/components/shared/research-time";
@@ -84,7 +85,7 @@ export function DashboardOverview({
     <div className="page-stack">
       <PageHeader
         title="Research overview"
-        description="Continue an investigation, review the research trail, and decide what needs attention."
+        description="Welcome back. Pick up a recent investigation, check what needs attention, or start something new. Your saved next actions are here when you need a nudge."
         metadata={<p className="text-xs text-text-secondary">{session.workspace.name}</p>}
         actions={
           <>
@@ -99,6 +100,7 @@ export function DashboardOverview({
           </>
         }
       />
+      <WorkspaceMapEntry />
       <div className="grid min-w-0 gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
         <ResearchSection
           id="recent-investigations"
@@ -121,8 +123,8 @@ export function DashboardOverview({
               title="No investigations yet"
               description={
                 projects.length === 0
-                  ? "Create a project, register a target, and begin a research trail. Your observations and hypotheses will stay together here."
-                  : "Start an investigation to record observations, develop hypotheses, and keep continuity between sessions."
+                  ? "Start with a project, add a target, then open an investigation for your first question. Your notes and ideas will stay together here."
+                  : "Open an investigation for a question you'd like to explore. Save observations, ideas, and next steps so you can pick it up later."
               }
               action={
                 <Button asChild variant="outline">
@@ -190,7 +192,7 @@ export function DashboardOverview({
             {attention.length === 0 ? (
               <EmptyState
                 title="No setup or scope items"
-                description="Projects without targets and targets with unresolved authorization will appear here."
+                description="When a project needs a target or an asset's permission needs attention, you'll see it here."
               />
             ) : (
               <ul className="flex flex-col divide-y divide-border">
@@ -216,7 +218,8 @@ export function DashboardOverview({
               awaiting validation
             </p>
             <p className="mt-2 text-xs leading-relaxed text-text-secondary">
-              Review the finding and its supporting evidence. Confirmation remains a human decision.
+              Open the finding and check its evidence. A human reviewer needs to decide whether
+              it&apos;s confirmed.
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <span className="text-xs text-text-secondary">
@@ -284,7 +287,7 @@ export function DashboardOverview({
           ) : (
             <EmptyState
               title="No evidence activity recorded"
-              description="Add evidence from an investigation. Original files, source references, and redaction status will appear here."
+              description="Upload evidence from an investigation. You'll see the files, source details, and redaction status here as the research grows."
             />
           )}
         </ResearchSection>
@@ -299,7 +302,7 @@ export function DashboardOverviewSkeleton() {
       <span className="sr-only">Loading research overview…</span>
       <PageHeader
         title="Research overview"
-        description="Your investigations and research activity."
+        description="Welcome back. Pick up a recent investigation, check what needs attention, or start something new. Your saved next actions are here when you need a nudge."
       />
       <div className="grid gap-10 xl:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]" aria-hidden>
         <div className="flex flex-col gap-5">

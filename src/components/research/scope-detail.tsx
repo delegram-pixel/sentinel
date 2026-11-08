@@ -39,6 +39,10 @@ export function ScopeDetailView({
         title={"Scope version " + scope.version}
         description={
           <>
+            <p className="mb-3">
+              Check the allowed assets, exclusions, activities, and dates before testing. A draft
+              needs activation with an attestation before it grants permission.
+            </p>
             <Link href={targetPath} className="record-link">
               {target.name}
             </Link>
@@ -64,16 +68,16 @@ export function ScopeDetailView({
       {scope.status === "DRAFT" ? (
         <Alert variant="warning" role="note">
           <AlertDescription>
-            This draft does not authorize target actions. Activate it with your authorization
-            attestation to make it effective.
+            This scope is still a draft. Check its boundaries, then activate it with your
+            authorization attestation before taking actions on the target.
           </AlertDescription>
         </Alert>
       ) : null}
       {scope.status === "ACTIVE" ? (
         <Alert role="note">
           <AlertDescription>
-            Self-attested authorization is recorded for this scope. Its effective dates and
-            exclusions define the recorded boundaries.
+            Your authorization attestation is saved. Check the effective dates and exclusions here
+            to stay within the scope&apos;s boundaries.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -81,15 +85,16 @@ export function ScopeDetailView({
         <Alert variant={scope.status === "REVOKED" ? "destructive" : "warning"} role="note">
           <AlertDescription>
             {scope.status === "REVOKED"
-              ? "This scope has been revoked and no longer authorizes target actions."
-              : "This scope has expired and no longer authorizes target actions."}
+              ? "This scope is revoked, so it no longer permits actions on the target. Use a new active scope for further work."
+              : "This scope has expired. You'll need a new active scope with current permission before taking further actions on the target."}
           </AlertDescription>
         </Alert>
       ) : null}
       {!canEdit ? (
         <Alert role="note">
           <AlertDescription>
-            This project is archived. Its scope records cannot be activated or revoked.
+            The project is archived, so its scope history is read-only. Activation and revocation
+            are closed.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -107,12 +112,12 @@ export function ScopeDetailView({
       <ResearchSection
         id="scope-assets"
         title="Asset boundaries"
-        description="Allowed assets define the boundary. Exclusions take precedence."
+        description="Check which assets are allowed and which are excluded. If both rules match, the exclusion wins."
       >
         {scope.assets.length === 0 ? (
           <EmptyState
             title="No assets recorded"
-            description="Asset rules will appear after they are recorded in this scope."
+            description="No asset rules are recorded here yet. A scope needs at least one allowed asset before it can be used."
           />
         ) : (
           <RecordTable caption={"Assets in scope version " + scope.version} minWidth="43rem">
@@ -154,12 +159,12 @@ export function ScopeDetailView({
       <ResearchSection
         id="scope-activities"
         title="Recorded activities"
-        description="These are the declared scope rules. Each action still requires its permitted capability."
+        description="Check the activities this scope allows or prohibits. Each action needs its own explicit permission."
       >
         {scope.activities.length === 0 ? (
           <EmptyState
             title="No activities recorded"
-            description="Permitted and prohibited activities will appear here when recorded."
+            description="No activities are recorded here yet. An action needs explicit permission in the scope before it can run."
           />
         ) : (
           <ul className="flex flex-col divide-y divide-border">
@@ -188,7 +193,7 @@ export function ScopeDetailView({
         <ResearchSection
           id="scope-activation"
           title="Activate this scope"
-          description="Confirm the source and date of your permission. Activation supersedes the previous active version."
+          description="Confirm where your permission comes from and its date. Activating this scope replaces the previous active version."
         >
           <div className="max-w-2xl">
             <ActivateScopeForm

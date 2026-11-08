@@ -28,13 +28,7 @@ export default async function NewInvestigationPage({ searchParams }: NewInvestig
   return (
     <FormPage
       title="New investigation"
-      description={
-        <>
-          {" "}
-          Choose a project and target, then state the research question. A scope does not need to be
-          active to document the investigation, but target actions still require one.{" "}
-        </>
-      }
+      description="Choose a project and target, then write the question you want to explore. You can start taking notes now; testing the target needs an active scope."
       backHref="/dashboard/investigations"
       backLabel="All investigations"
     >
@@ -62,7 +56,7 @@ async function NewInvestigationContent({ defaultProjectId }: { defaultProjectId?
       <EmptyState
         headingLevel={2}
         title="Create a project to begin"
-        description="An investigation belongs to a project and a registered target. Create the project first, then register the asset you want to research."
+        description="Create a project first, then register the asset you want to research. Once both are ready, you can start an investigation for your question."
         action={
           <Button asChild>
             <Link href="/dashboard/projects/new">Create project</Link>

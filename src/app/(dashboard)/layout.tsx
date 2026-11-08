@@ -8,25 +8,28 @@ import { isClerkConfigured } from "@/config/clerk";
 import { getSessionContext } from "@/lib/session";
 import { NewUserTour } from "@/components/onboarding/new-user-tour";
 import { WorkspaceTourProvider } from "@/components/onboarding/workspace-tour-provider";
+import { WorkspaceMapProvider } from "@/components/onboarding/workspace-map-provider";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   if (!isClerkConfigured()) return <ClerkSetupNotice />;
 
   return (
     <WorkspaceTourProvider>
-      <AppShell
-        workspaceName={
-          <Suspense fallback={<Skeleton className="h-4 w-28" />}>
-            <WorkspaceName />
-          </Suspense>
-        }
-        accountMenu={<AccountMenu />}
-      >
-        {children}
-      </AppShell>
-      <Suspense fallback={null}>
-        <NewUserTour />
-      </Suspense>
+      <WorkspaceMapProvider>
+        <AppShell
+          workspaceName={
+            <Suspense fallback={<Skeleton className="h-4 w-28" />}>
+              <WorkspaceName />
+            </Suspense>
+          }
+          accountMenu={<AccountMenu />}
+        >
+          {children}
+        </AppShell>
+        <Suspense fallback={null}>
+          <NewUserTour />
+        </Suspense>
+      </WorkspaceMapProvider>
     </WorkspaceTourProvider>
   );
 }

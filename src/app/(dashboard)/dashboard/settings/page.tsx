@@ -18,7 +18,7 @@ export default function SettingsPage() {
     <div className="page-stack">
       <PageHeader
         title="Settings"
-        description="Your account, workspace membership, and recorded activity."
+        description="Get your bearings: check your account and workspace details, revisit the guided tour, or look through activity history. Use the account menu above to manage your profile."
       />
       <Suspense
         fallback={

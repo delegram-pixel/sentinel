@@ -13,7 +13,7 @@ export function ReportList({ reports }: { reports: ReportRow[] }) {
       <EmptyState
         headingLevel={2}
         title="No reports recorded"
-        description="Create a report from an investigation with confirmed or reportable findings. Reports keep an immutable revision history and require human approval before export."
+        description="Open an investigation with confirmed or reportable findings to start a report. Save revisions as you refine it, then get human approval before exporting."
         action={
           <Button asChild variant="outline">
             <Link href="/dashboard/reports/new">Create a report</Link>

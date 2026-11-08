@@ -62,7 +62,7 @@ export class PrismaDecisionStore implements DecisionStore {
       )
         throw new ResearchOperationError(
           "INVALID_SOURCE",
-          "That hypothesis does not belong to this investigation.",
+          "Choose a hypothesis from this investigation so the finding stays connected to its research.",
         );
       if (
         input.sourceTaskId &&

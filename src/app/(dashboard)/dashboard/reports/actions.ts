@@ -82,7 +82,12 @@ export async function createReportAction(
   };
 
   if (!investigationId) {
-    return { status: "error", message: "The investigation identifier is missing.", values };
+    return {
+      status: "error",
+      message:
+        "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
+      values,
+    };
   }
 
   const payload = {
@@ -96,7 +101,7 @@ export async function createReportAction(
   if (!parsed.success) {
     return {
       status: "error",
-      message: "Check the highlighted fields and try again.",
+      message: "A few details need attention. Check the highlighted fields, then try again.",
       fieldErrors: toFieldErrors(parsed.error.issues, REPORT_CREATE_FIELDS),
       values,
     };
@@ -127,7 +132,11 @@ export async function saveReportRevisionAction(
   const values = { content: stringValue(formData, "content") };
 
   if (!reportId) {
-    return { status: "error", message: "The report identifier is missing.", values };
+    return {
+      status: "error",
+      message: "We couldn't identify the report. Reopen it from Reports, then try again.",
+      values,
+    };
   }
 
   const parsed = reportContentSchema.safeParse(values);
@@ -165,7 +174,10 @@ export async function submitReportAction(
   const investigationId = stringValue(formData, "investigationId");
 
   if (!reportId) {
-    return { status: "error", message: "The report identifier is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the report. Reopen it from Reports, then try again.",
+    };
   }
 
   const session = await getSessionContext();
@@ -192,7 +204,10 @@ export async function approveReportAction(
   const investigationId = stringValue(formData, "investigationId");
 
   if (!reportId) {
-    return { status: "error", message: "The report identifier is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the report. Reopen it from Reports, then try again.",
+    };
   }
 
   const session = await getSessionContext();
@@ -219,7 +234,10 @@ export async function reopenReportAction(
   const investigationId = stringValue(formData, "investigationId");
 
   if (!reportId) {
-    return { status: "error", message: "The report identifier is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the report. Reopen it from Reports, then try again.",
+    };
   }
 
   const session = await getSessionContext();
@@ -246,7 +264,10 @@ export async function archiveReportAction(
   const investigationId = stringValue(formData, "investigationId");
 
   if (!reportId) {
-    return { status: "error", message: "The report identifier is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the report. Reopen it from Reports, then try again.",
+    };
   }
 
   const session = await getSessionContext();
@@ -275,7 +296,10 @@ export async function exportReportAction(
   const format = requestedFormat === "PDF" ? "PDF" : "MARKDOWN";
 
   if (!reportId) {
-    return { status: "error", message: "The report identifier is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the report. Reopen it from Reports, then try again.",
+    };
   }
 
   const session = await getSessionContext();

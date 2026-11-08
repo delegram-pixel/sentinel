@@ -383,7 +383,7 @@ export async function runAiTask(
   if (!context) {
     return failure(
       "AI_INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -879,7 +879,7 @@ export async function createConversation(
   if (!context) {
     return failure(
       "AI_INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 

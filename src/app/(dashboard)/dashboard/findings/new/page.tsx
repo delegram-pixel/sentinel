@@ -48,7 +48,7 @@ async function NewFindingContent({ searchParams }: NewFindingPageProps) {
   return (
     <FormPage
       title="New finding"
-      description={`Record a candidate finding in ${investigation.title}.`}
+      description={`Found a lead in ${investigation.title}? Describe the suspected issue, its impact, and the affected asset. You can link supporting evidence after saving.`}
       backHref={`/dashboard/investigations/${investigation.id}`}
       backLabel="Back to investigation"
     >

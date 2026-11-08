@@ -19,6 +19,7 @@ export async function adoptAiReportAction(
   revalidatePath("/dashboard/reports", "layout");
   return {
     status: "success",
-    message: "AI draft adopted as a new revision. Human approval is required.",
+    message:
+      "The AI draft is saved as a new revision. Review it and get human approval before exporting.",
   };
 }

@@ -29,7 +29,7 @@ export function AuditHistory({
       {entries.length === 0 ? (
         <EmptyState
           title="No activity recorded yet"
-          description="Workspace setup, research records, and scope changes will appear here."
+          description="As you set up the workspace and save research or scope changes, you'll see the activity here."
         />
       ) : (
         <ol className="flex flex-col divide-y divide-border" aria-label="Recent audit events">

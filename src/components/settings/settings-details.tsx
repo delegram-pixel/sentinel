@@ -10,7 +10,7 @@ export function SettingsDetails({ session }: { session: SessionContext }) {
       <ResearchSection
         id="account"
         title="Account"
-        description="Your profile and sign-in identity."
+        description="Check which account you're signed in with."
       >
         <MetadataList
           items={[
@@ -19,19 +19,19 @@ export function SettingsDetails({ session }: { session: SessionContext }) {
           ]}
         />
         <p className="mt-6 text-xs leading-relaxed text-text-secondary">
-          Use the account menu in the header to manage your profile or sign out.
+          To update your profile or sign out, open the account menu in the header.
         </p>
         <div className="mt-6 flex flex-col gap-2">
           <ReplayWorkspaceTourButton />
           <p className="text-xs text-text-secondary">
-            A quick guide to the research workflow and where to find things.
+            Take a quick tour of the research workflow and where everything lives.
           </p>
         </div>
       </ResearchSection>
       <ResearchSection
         id="workspace"
         title="Workspace"
-        description="The personal workspace associated with your account."
+        description="This is the personal workspace linked to your account."
       >
         <MetadataList
           className="sm:grid-cols-2"
@@ -46,7 +46,7 @@ export function SettingsDetails({ session }: { session: SessionContext }) {
           ]}
         />
         <p className="mt-6 text-xs leading-relaxed text-text-secondary">
-          Your projects, research records, and recorded activity belong to this workspace.
+          The projects, research, and activity you save live in this workspace.
         </p>
       </ResearchSection>
     </div>

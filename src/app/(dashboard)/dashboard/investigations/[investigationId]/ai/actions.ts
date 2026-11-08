@@ -75,7 +75,9 @@ async function executeTask(
   operationKey: string,
 ): Promise<{ conversationId: string }> {
   if (operationKey.length < 8 || operationKey.length > 160)
-    throw new Error("Reload this form to obtain a valid analysis operation identifier.");
+    throw new Error(
+      "This analysis form needs a refresh. Reload it, then submit the request again.",
+    );
   const session = await getSessionContext();
   const deps = dependencies();
   const conversation = await resolveConversation(
@@ -113,7 +115,9 @@ export async function createConversationAction(
   const title = stringValue(formData, "title");
 
   if (!investigationId) {
-    return errorState("The investigation identifier is missing.");
+    return errorState(
+      "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
+    );
   }
 
   const session = await getSessionContext();
@@ -140,7 +144,9 @@ export async function runReconAnalysisAction(
   const conversationId = stringValue(formData, "conversationId");
 
   if (!investigationId) {
-    return errorState("The investigation identifier is missing.");
+    return errorState(
+      "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
+    );
   }
 
   let conversation: { conversationId: string };
@@ -172,7 +178,9 @@ export async function runHypothesisGenerationAction(
   const conversationId = stringValue(formData, "conversationId");
 
   if (!investigationId) {
-    return errorState("The investigation identifier is missing.");
+    return errorState(
+      "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
+    );
   }
 
   let conversation: { conversationId: string };
@@ -203,10 +211,12 @@ export async function generateSessionSummaryAction(
   const investigationId = stringValue(formData, "investigationId");
   const operationKey = stringValue(formData, "operationKey");
   if (operationKey.length < 8 || operationKey.length > 160)
-    return errorState("Reload the form to obtain a valid operation identifier.");
+    return errorState("This form needs a refresh. Reload it, then try again.");
 
   if (!investigationId) {
-    return errorState("The investigation identifier is missing.");
+    return errorState(
+      "We couldn't identify the investigation. Reopen it from Investigations, then try again.",
+    );
   }
 
   const session = await getSessionContext();

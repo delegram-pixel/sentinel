@@ -20,7 +20,7 @@ export default function InvestigationsPage() {
     <div className="page-stack">
       <PageHeader
         title="Investigations"
-        description="The research trail: observations, hypotheses, and the context for your next session."
+        description="Pick a question and follow the clues. Open an investigation to save observations, test ideas, and leave notes for your next session. Future you has enough mysteries."
         actions={
           <Button asChild>
             <Link href="/dashboard/investigations/new">New investigation</Link>

@@ -61,11 +61,17 @@ function assertEditable(context: {
   investigationStatus: string;
 }): DomainResult<true> {
   if (context.projectStatus === "ARCHIVED") {
-    return failure("PROJECT_ARCHIVED", "Evidence in an archived project cannot be changed.");
+    return failure(
+      "PROJECT_ARCHIVED",
+      "This project is archived, so its evidence records are read-only.",
+    );
   }
 
   if (context.investigationStatus === "ARCHIVED") {
-    return failure("INVESTIGATION_ARCHIVED", "An archived investigation cannot be changed.");
+    return failure(
+      "INVESTIGATION_ARCHIVED",
+      "This investigation is archived. You can revisit its history, but editing is closed.",
+    );
   }
 
   return { ok: true, value: true };
@@ -127,7 +133,7 @@ export async function createEvidenceUploadIntent(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -190,7 +196,10 @@ export async function finalizeEvidenceUpload(
   const evidence = await store.findEvidence(actor.workspaceId, evidenceId);
 
   if (!evidence || !canView(actor, evidence)) {
-    return failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+    return failure(
+      "EVIDENCE_NOT_FOUND",
+      "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+    );
   }
 
   if (evidence.deletedAt) {
@@ -202,11 +211,17 @@ export async function finalizeEvidenceUpload(
   }
 
   if (!evidence.quarantineKey) {
-    return failure("EVIDENCE_NOT_UPLOADED", "No quarantined upload was found for this evidence.");
+    return failure(
+      "EVIDENCE_NOT_UPLOADED",
+      "We couldn't find the quarantined upload. Upload the file again to continue its review.",
+    );
   }
 
   if (!isEvidenceMimeType(evidence.mimeType)) {
-    return failure("UNSUPPORTED_MEDIA_TYPE", "That file type is not allowed.");
+    return failure(
+      "UNSUPPORTED_MEDIA_TYPE",
+      "This file type isn't supported. Choose one of the formats listed beside the upload field.",
+    );
   }
 
   const stored = await storage.statObject(evidence.quarantineKey);
@@ -214,29 +229,38 @@ export async function finalizeEvidenceUpload(
   if (!stored) {
     return failure(
       "EVIDENCE_UPLOAD_MISSING",
-      "The upload was not found. Upload the file and try again.",
+      "We couldn't find the upload. Upload the file, then try again.",
     );
   }
 
   if (stored.size <= 0) {
-    return failure("EVIDENCE_EMPTY", "The uploaded file is empty.");
+    return failure(
+      "EVIDENCE_EMPTY",
+      "The uploaded file is empty. Choose a file with content and upload it again.",
+    );
   }
 
   if (stored.size > MAX_EVIDENCE_BYTES) {
-    return failure("EVIDENCE_TOO_LARGE", "Evidence files must be 25 MB or smaller.");
+    return failure(
+      "EVIDENCE_TOO_LARGE",
+      "This file is too large. Choose an evidence file of 25 MB or less.",
+    );
   }
 
   if (stored.size !== evidence.fileSize) {
     return failure(
       "EVIDENCE_SIZE_MISMATCH",
-      "The uploaded file size does not match the upload intent.",
+      "The uploaded file's size doesn't match the file selected at the start. Choose the file again and retry the upload.",
     );
   }
 
   const object = await storage.getObject(evidence.quarantineKey);
 
   if (!object) {
-    return failure("EVIDENCE_UPLOAD_MISSING", "The uploaded file could not be read.");
+    return failure(
+      "EVIDENCE_UPLOAD_MISSING",
+      "We couldn't read the uploaded file. Try uploading it again.",
+    );
   }
 
   const checksum = createHash("sha256").update(object.body).digest("hex");
@@ -255,7 +279,10 @@ export async function finalizeEvidenceUpload(
   if (!detected) {
     await storage.deleteObject(evidence.quarantineKey);
 
-    return failure("EVIDENCE_TYPE_UNKNOWN", "The file content could not be verified.");
+    return failure(
+      "EVIDENCE_TYPE_UNKNOWN",
+      "We couldn't verify this file's content. Check that it's a supported file and try uploading it again.",
+    );
   }
 
   if (!mimeTypesCompatible(evidence.mimeType, detected)) {
@@ -263,7 +290,7 @@ export async function finalizeEvidenceUpload(
 
     return failure(
       "EVIDENCE_TYPE_MISMATCH",
-      "The file content does not match the declared file type.",
+      "The file's content doesn't match its selected type. Check the format and choose the correct file before uploading again.",
     );
   }
 
@@ -293,7 +320,10 @@ export async function finalizeEvidenceUpload(
   );
 
   if (!updated) {
-    return failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+    return failure(
+      "EVIDENCE_NOT_FOUND",
+      "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+    );
   }
 
   return { ok: true, value: { id: updated.id, redactionStatus: updated.redactionStatus } };
@@ -329,7 +359,10 @@ export async function updateEvidenceMetadata(
   const evidence = await store.findEvidence(actor.workspaceId, evidenceId);
 
   if (!evidence || !canView(actor, evidence)) {
-    return failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+    return failure(
+      "EVIDENCE_NOT_FOUND",
+      "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+    );
   }
 
   const investigation = await store.findInvestigation(actor.workspaceId, evidence.investigationId);
@@ -337,7 +370,7 @@ export async function updateEvidenceMetadata(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -368,7 +401,10 @@ export async function updateEvidenceMetadata(
 
   return updated
     ? { ok: true, value: { id: updated.id } }
-    : failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+    : failure(
+        "EVIDENCE_NOT_FOUND",
+        "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+      );
 }
 
 export async function reviewEvidenceRedaction(
@@ -388,14 +424,17 @@ export async function reviewEvidenceRedaction(
   if (!isReviewer(actor.role)) {
     return failure(
       "FORBIDDEN_EVIDENCE_REVIEWER",
-      "A workspace owner, admin, or reviewer must resolve redaction.",
+      "Ask a workspace owner, admin, or reviewer to complete the redaction review.",
     );
   }
 
   const evidence = await store.findEvidence(actor.workspaceId, evidenceId);
 
   if (!evidence) {
-    return failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+    return failure(
+      "EVIDENCE_NOT_FOUND",
+      "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+    );
   }
 
   if (evidence.deletedAt) {
@@ -407,7 +446,7 @@ export async function reviewEvidenceRedaction(
   if (!investigation) {
     return failure(
       "INVESTIGATION_NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   }
 
@@ -418,11 +457,17 @@ export async function reviewEvidenceRedaction(
   }
 
   if (evidence.storageKey) {
-    return failure("EVIDENCE_ALREADY_ACTIVE", "Active evidence cannot be reviewed again.");
+    return failure(
+      "EVIDENCE_ALREADY_ACTIVE",
+      "This evidence is already active. Use a reviewed replacement if the file needs to change.",
+    );
   }
 
   if (!evidence.quarantineKey) {
-    return failure("EVIDENCE_NOT_UPLOADED", "That evidence has no quarantined upload to review.");
+    return failure(
+      "EVIDENCE_NOT_UPLOADED",
+      "There's no quarantined file to review for this evidence. Check its upload status first.",
+    );
   }
 
   if (parsed.data.decision === "REJECT") {
@@ -448,13 +493,16 @@ export async function reviewEvidenceRedaction(
 
     return rejected
       ? { ok: true, value: { id: rejected.id, redactionStatus: rejected.redactionStatus } }
-      : failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+      : failure(
+          "EVIDENCE_NOT_FOUND",
+          "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+        );
   }
 
   if (!evidence.uploadValidatedAt) {
     return failure(
       "UPLOAD_NOT_VALIDATED",
-      "Finalize and validate the uploaded evidence before approving it.",
+      "Finish the upload and its validation checks first, then approve the evidence after review.",
     );
   }
 
@@ -483,7 +531,7 @@ export async function reviewEvidenceRedaction(
   } catch {
     return failure(
       "EVIDENCE_ACTIVATION_RETRY_QUEUED",
-      "The reviewed promotion is recorded and queued for a storage retry. The quarantined original is retained.",
+      "Your review is saved, but moving the file out of quarantine needs a retry. It's queued, and the quarantined original is still retained.",
     );
   }
 
@@ -492,7 +540,7 @@ export async function reviewEvidenceRedaction(
   if (!copy || createHash("sha256").update(copy.body).digest("hex") !== evidence.checksum) {
     return failure(
       "EVIDENCE_ACTIVATION_FAILED",
-      "The stored object failed verification and was not activated.",
+      "The stored file didn't pass verification, so the evidence wasn't activated. Check its status before continuing.",
     );
   }
 
@@ -521,7 +569,10 @@ export async function reviewEvidenceRedaction(
       current.redactionReviewedBy === actor.userId
     )
       return { ok: true, value: { id: current.id, redactionStatus: current.redactionStatus } };
-    return failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+    return failure(
+      "EVIDENCE_NOT_FOUND",
+      "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+    );
   }
 
   try {
@@ -543,7 +594,10 @@ export async function deleteEvidence(
   const evidence = await store.findEvidence(actor.workspaceId, evidenceId);
 
   if (!evidence || !canView(actor, evidence)) {
-    return failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+    return failure(
+      "EVIDENCE_NOT_FOUND",
+      "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+    );
   }
 
   if (evidence.deletedAt) {
@@ -553,7 +607,7 @@ export async function deleteEvidence(
   if (!isReviewer(actor.role) && evidence.uploadedBy !== actor.userId) {
     return failure(
       "FORBIDDEN_EVIDENCE_DELETE",
-      "Only the uploader or a reviewer can delete evidence.",
+      "Ask the uploader or a reviewer to delete this evidence.",
     );
   }
 
@@ -587,7 +641,10 @@ export async function deleteEvidence(
 
   return deleted
     ? { ok: true, value: { id: evidenceId } }
-    : failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+    : failure(
+        "EVIDENCE_NOT_FOUND",
+        "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+      );
 }
 
 export async function createEvidenceDownload(
@@ -599,7 +656,10 @@ export async function createEvidenceDownload(
   const evidence = await store.findEvidence(actor.workspaceId, evidenceId);
 
   if (!evidence || !canView(actor, evidence)) {
-    return failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+    return failure(
+      "EVIDENCE_NOT_FOUND",
+      "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+    );
   }
 
   if (evidence.deletedAt) {
@@ -609,13 +669,16 @@ export async function createEvidenceDownload(
   const key = evidence.storageKey ?? evidence.quarantineKey;
 
   if (!key) {
-    return failure("EVIDENCE_NOT_UPLOADED", "That evidence has no stored object.");
+    return failure(
+      "EVIDENCE_NOT_UPLOADED",
+      "There's no stored file available for this evidence. Check the record's upload status.",
+    );
   }
 
   if (!evidence.storageKey && !isReviewer(actor.role)) {
     return failure(
       "EVIDENCE_NOT_APPROVED",
-      "Quarantined evidence can only be downloaded by its uploader or a reviewer.",
+      "Only the uploader or a reviewer can download a quarantined file. Ask them to inspect it and complete the review.",
     );
   }
 
@@ -637,23 +700,35 @@ export async function linkEvidence(
   const parsed = evidenceLinkSchema.safeParse(rawInput);
 
   if (!parsed.success) {
-    return failure("VALIDATION_FAILED", "Choose approved evidence and a relationship.");
+    return failure(
+      "VALIDATION_FAILED",
+      "Choose approved evidence and say how it relates to the finding.",
+    );
   }
 
   const evidence = await store.findEvidence(actor.workspaceId, parsed.data.evidenceId);
 
   if (!evidence || !canView(actor, evidence)) {
-    return failure("EVIDENCE_NOT_FOUND", "That evidence does not exist in this workspace.");
+    return failure(
+      "EVIDENCE_NOT_FOUND",
+      "We can't find that evidence in this workspace. Open Evidence to choose an available record.",
+    );
   }
 
   if (!isApprovedEvidence(evidence.redactionStatus) || !evidence.storageKey) {
-    return failure("EVIDENCE_NOT_APPROVED", "Only approved evidence can link to a finding.");
+    return failure(
+      "EVIDENCE_NOT_APPROVED",
+      "Complete the evidence review and approval before linking it to a finding.",
+    );
   }
 
   const finding = await store.findFindingForLink(actor.workspaceId, parsed.data.findingId);
 
   if (!finding || finding.investigationId !== evidence.investigationId) {
-    return failure("FINDING_NOT_FOUND", "That finding is not in this investigation.");
+    return failure(
+      "FINDING_NOT_FOUND",
+      "Choose a finding from this investigation to connect the evidence.",
+    );
   }
 
   try {

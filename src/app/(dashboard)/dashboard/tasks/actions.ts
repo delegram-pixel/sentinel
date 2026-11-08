@@ -21,7 +21,8 @@ export async function reconcileUsageAction(
   if (!p.success)
     return {
       status: "error",
-      message: "Enter the total provider usage and its reconciliation reference.",
+      message:
+        "Enter the total usage billed by the provider and the reference that backs up those figures.",
     };
   const result = await reconcileAiUsage(
     getDb(),
@@ -30,7 +31,10 @@ export async function reconcileUsageAction(
   );
   if (!result.ok) return { status: "error", message: result.message };
   revalidatePath("/dashboard/tasks");
-  return { status: "success", message: "Usage reconciled and the reservation released." };
+  return {
+    status: "success",
+    message: "The usage figures are reconciled and the token reservation is released.",
+  };
 }
 export async function cancelJobAction(
   _state: ResearchFormState,
@@ -38,7 +42,11 @@ export async function cancelJobAction(
 ): Promise<ResearchFormState> {
   const session = await getSessionContext();
   const id = z.uuid().safeParse(form.get("jobId"));
-  if (!id.success) return { status: "error", message: "Invalid work identifier." };
+  if (!id.success)
+    return {
+      status: "error",
+      message: "We couldn't identify this work item. Refresh the page, then try again.",
+    };
   const result = await cancelResearchJob(
     new PrismaJobStore(getDb()),
     { workspaceId: session.workspace.id, userId: session.user.id, role: session.role },
@@ -46,8 +54,13 @@ export async function cancelJobAction(
   );
   revalidatePath("/dashboard/tasks");
   return result.ok && result.value
-    ? { status: "success", message: "Cancellation recorded." }
-    : { status: "error", message: result.ok ? "This work already finished." : result.message };
+    ? { status: "success", message: "Your cancellation request is saved." }
+    : {
+        status: "error",
+        message: result.ok
+          ? "This work has already finished, so it can't be cancelled."
+          : result.message,
+      };
 }
 export async function queueAnalysisAction(
   _state: ResearchFormState,
@@ -56,7 +69,10 @@ export async function queueAnalysisAction(
   const session = await getSessionContext();
   const input = aiJobInputSchema.safeParse(Object.fromEntries(form.entries()));
   if (!input.success)
-    return { status: "error", message: "Choose an investigation and analytical task." };
+    return {
+      status: "error",
+      message: "Choose an investigation and the analysis you'd like to run.",
+    };
   const context = await new PrismaAIStore(getDb()).loadContext(
     session.workspace.id,
     input.data.investigationId,
@@ -66,7 +82,11 @@ export async function queueAnalysisAction(
     context.project.status === "ARCHIVED" ||
     context.investigation.status === "ARCHIVED"
   )
-    return { status: "error", message: "Choose active research in this workspace." };
+    return {
+      status: "error",
+      message:
+        "Choose an investigation whose project and research are still active in this workspace.",
+    };
   const result = await enqueueResearchJob(
     new PrismaJobStore(getDb()),
     { workspaceId: session.workspace.id, userId: session.user.id, role: session.role },
@@ -78,7 +98,8 @@ export async function queueAnalysisAction(
   return result.ok
     ? {
         status: "success",
-        message: "Analysis queued. Results appear in the investigation's task history.",
+        message:
+          "Your analysis is queued. Check the investigation's task history for its status and results.",
       }
     : { status: "error", message: result.message };
 }

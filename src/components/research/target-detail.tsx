@@ -23,7 +23,11 @@ export function TargetDetailView({ target, canEdit }: { target: TargetDetail; ca
         title={target.name}
         description={
           <>
-            <p className="record-metadata">{target.assetIdentifier}</p>
+            <p>
+              Check this asset&apos;s details and your source of permission. Review its scope
+              history below, or draft a new version when the testing boundaries change.
+            </p>
+            <p className="record-metadata mt-2">{target.assetIdentifier}</p>
             {target.description ? <p className="mt-3">{target.description}</p> : null}
           </>
         }
@@ -52,8 +56,8 @@ export function TargetDetailView({ target, canEdit }: { target: TargetDetail; ca
       {!canEdit ? (
         <Alert role="note">
           <AlertDescription>
-            This target belongs to an archived project. Its history remains available, and its
-            records cannot be changed.
+            This target&apos;s project is archived. You can still read the history; editing is
+            closed.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -88,7 +92,7 @@ export function TargetDetailView({ target, canEdit }: { target: TargetDetail; ca
       <ResearchSection
         id="authorization-context"
         title="Authorization context"
-        description="Your recorded source of permission. Authorization in Sentinel is self-attested."
+        description="Here's where you've recorded your permission to research this asset. Sentinel relies on your attestation, so check that the source and scope are current."
       >
         <MetadataList
           className="sm:grid-cols-2"
@@ -141,7 +145,7 @@ export function TargetDetailView({ target, canEdit }: { target: TargetDetail; ca
         {target.scopes.length === 0 ? (
           <EmptyState
             title="No scope versions yet"
-            description="A scope records permitted assets, excluded assets, activities, and the effective authorization window."
+            description="Draft a scope to spell out what's allowed, what's excluded, and when permission applies. Activate it with an attestation before testing."
           />
         ) : (
           <RecordTable caption={"Scope versions for " + target.name} minWidth="43rem">

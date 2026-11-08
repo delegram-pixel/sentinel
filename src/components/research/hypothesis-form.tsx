@@ -133,7 +133,7 @@ export function HypothesisForm(props: HypothesisFormProps) {
             required
             rows={4}
             maxLength={5000}
-            placeholder="Explain the suspected issue and why it may be exploitable."
+            placeholder="What might be happening, and why do you think it could be exploitable?"
             defaultValue={state.values.description}
             aria-invalid={Boolean(state.fieldErrors?.description)}
             aria-describedby={
@@ -169,7 +169,7 @@ export function HypothesisForm(props: HypothesisFormProps) {
             name="missingInformation"
             rows={3}
             maxLength={2000}
-            placeholder="What evidence would confirm or reject this hypothesis?"
+            placeholder="What evidence would support this idea or rule it out?"
             defaultValue={state.values.missingInformation}
             aria-invalid={Boolean(state.fieldErrors?.missingInformation)}
             aria-describedby={
@@ -186,7 +186,7 @@ export function HypothesisForm(props: HypothesisFormProps) {
             <FieldLegend className="text-sm font-medium">Link observations</FieldLegend>
             {props.observations.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Add observations first to link them when creating this hypothesis.
+                Add an observation first, then you can connect it to this hypothesis.
               </p>
             ) : (
               <div className="flex flex-col gap-3">

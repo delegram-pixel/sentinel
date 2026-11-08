@@ -94,8 +94,8 @@ export function FindingForm(props: FindingFormProps) {
       title="Finding details"
       description={
         <>
-          A finding is a candidate vulnerability. It can be confirmed only by a human reviewer and
-          only after severity, affected asset, and supporting evidence are recorded.
+          Describe the issue you suspect. Add its severity, affected asset, and supporting evidence
+          so a human reviewer can decide whether to confirm it.
         </>
       }
     >
@@ -178,9 +178,9 @@ export function FindingForm(props: FindingFormProps) {
                 htmlFor="finding-asset"
                 help={{
                   description:
-                    "Identify the specific asset, endpoint, or component affected by this claim. Keep it precise enough to connect the finding to its scope and evidence.",
+                    "Name the exact asset, endpoint, or component affected. A precise reference helps the reviewer connect your claim to its scope and evidence.",
                   example:
-                    "The /profile endpoint in the authorized lab application, rather than the entire project.",
+                    "Use the /profile endpoint in your authorized lab app when that's where the issue appears.",
                 }}
               >
                 Affected asset
@@ -226,10 +226,10 @@ export function FindingForm(props: FindingFormProps) {
                 htmlFor="finding-impact"
                 help={{
                   description:
-                    "Explain the consequence supported by the evidence, who or what is affected, and any conditions needed for that consequence to occur.",
+                    "Explain what can happen, who's affected, and what conditions make it possible. Keep the claim tied to what your evidence shows.",
                   example:
-                    "A supplied response exposes another lab account's profile fields when the recorded request uses that account's identifier.",
-                  note: "Distinguish demonstrated impact from assumptions or a possible worst case.",
+                    "A saved response reveals another lab account's profile when the request uses that account's identifier.",
+                  note: "Be clear about what you've demonstrated and what is still an assumption.",
                 }}
               >
                 Impact

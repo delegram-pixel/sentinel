@@ -9,5 +9,8 @@ export async function removeResearchEvidenceLink(
   if (!result.ok) return result;
   return result.value
     ? { ok: true, value: true }
-    : failure("EVIDENCE_LINK_NOT_FOUND", "That evidence link does not exist.");
+    : failure(
+        "EVIDENCE_LINK_NOT_FOUND",
+        "We can't find that evidence link. Reopen the record to check its current connections.",
+      );
 }

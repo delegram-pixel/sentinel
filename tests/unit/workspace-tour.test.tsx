@@ -88,7 +88,7 @@ describe("workspace tour interactions", () => {
       </StrictMode>,
     );
     const dialog = await screen.findByRole("dialog", { name: "Your research starts here." });
-    expect(dialog).toHaveAccessibleDescription(/Welcome to Sentinel Research/);
+    expect(dialog).toHaveAccessibleDescription(/Welcome to Sentinel/);
     expect(screen.getByRole("button", { name: "Start tour" })).toHaveFocus();
     await user.tab();
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
@@ -115,7 +115,7 @@ describe("workspace tour interactions", () => {
     const user = userEvent.setup();
     render(<TourHarness />);
     await user.click(screen.getByRole("button", { name: "Help for Finding your way" }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("On a desktop, use the sidebar");
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Use the sidebar on a desktop");
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeVisible();
@@ -211,7 +211,7 @@ describe("workspace tour interactions", () => {
     render(<TourHarness />);
     await user.keyboard("{Escape}");
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "We couldn’t save your tour preference.",
+      "We couldn't save your tour preference.",
     );
     const skip = screen.getAllByRole("button", { name: "Skip tour" })[1]!;
     await waitFor(() => expect(skip).toBeEnabled());

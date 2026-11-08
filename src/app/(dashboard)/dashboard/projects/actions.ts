@@ -59,7 +59,7 @@ function invalidState(
 ): ProjectFormState {
   return {
     status: "error",
-    message: "Check the highlighted fields and try again.",
+    message: "A few details need attention. Check the highlighted fields, then try again.",
     fieldErrors: toFieldErrors(issues),
     values,
   };
@@ -102,7 +102,11 @@ export async function updateProjectAction(
   const values = readValues(formData);
 
   if (!projectId) {
-    return { status: "error", message: "The project identifier is missing.", values };
+    return {
+      status: "error",
+      message: "We couldn't identify the project. Reopen it from Projects, then try again.",
+      values,
+    };
   }
 
   const parsed = projectInputSchema.safeParse(values);
@@ -138,7 +142,10 @@ export async function archiveProjectAction(
   const projectId = readProjectId(formData);
 
   if (!projectId) {
-    return { status: "error", message: "The project identifier is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the project. Reopen it from Projects, then try again.",
+    };
   }
 
   const session = await getSessionContext();

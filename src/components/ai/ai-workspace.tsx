@@ -95,17 +95,17 @@ function TaskHistory({ tasks }: { tasks: AiTaskRow[] }) {
       title="Task history"
       help={{
         description:
-          "Every AI request retains execution status and model/prompt provenance. Inspect the task's sources, attempts, and failure details before trusting its result or retrying it.",
+          "Each request keeps a record of its status, model, prompt, and sources. Open the task to check what it used and what happened, especially if the request failed.",
         example:
-          "After an evidence review, open the recorded task to see the exact input context and the validated output.",
-        note: "A completed task means analysis finished; it is not human finding approval.",
+          "Open a task after an evidence review to see exactly what context the AI received and the output that passed validation.",
+        note: "Completed means the analysis finished. A human reviewer still needs to approve the finding.",
       }}
-      description="Recorded execution status, model and prompt provenance, and token usage."
+      description="Check what ran, which model and prompt it used, and how many tokens it consumed."
     >
       {tasks.length === 0 ? (
         <EmptyState
           title="No AI tasks recorded"
-          description="Ask a question in Guided mode or run a bounded analysis in Delegated mode. Completed and failed tasks appear here."
+          description="Ask a question in Guided mode or run a focused analysis in Delegated mode. You'll see the task and its outcome here."
         />
       ) : (
         <RecordTable caption="AI task history" minWidth="48rem">
@@ -230,7 +230,15 @@ export function AiWorkspace({
       </Link>
       <PageHeader
         title="Research assistance"
-        description={investigationTitle}
+        description={
+          <>
+            <p>
+              Talk through a question in Guided mode or run a focused analysis in Delegated mode.
+              Check the suggestions against your evidence before using them.
+            </p>
+            <p className="mt-3">{investigationTitle}</p>
+          </>
+        }
         metadata={
           <div className="flex flex-wrap items-center gap-4">
             <SourceLabel source="ai" />
@@ -250,7 +258,8 @@ export function AiWorkspace({
         <Alert>
           <AlertTitle>Research record archived</AlertTitle>
           <AlertDescription>
-            You can read the existing history. New conversations and tasks are unavailable.
+            This research is archived, so you can revisit earlier conversations and results. New
+            conversations and tasks are closed.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -261,10 +270,10 @@ export function AiWorkspace({
             title="Research context"
             help={{
               description:
-                "The assistant uses persisted investigation context, including the objective, target and scope, recorded research, and eligible source material. Sources are selected before each request.",
+                "The assistant works from this investigation's saved objective, target, scope, research, and eligible sources. The app selects the sources before each request.",
               example:
-                "Save an observation and link approved evidence before asking the assistant to assess a hypothesis.",
-              note: "Check the task snapshot to see what the model actually received. Unapproved or non-AI-safe material must not be assumed available.",
+                "Save the observation and link approved evidence first, then ask the assistant to assess your hypothesis.",
+              note: "Check the task snapshot to see what the model received. Material that's unapproved or not AI-safe isn't available for it to use.",
             }}
           >
             <MetadataList
@@ -296,8 +305,8 @@ export function AiWorkspace({
               ]}
             />
             <p className="mt-4 text-xs leading-relaxed text-text-secondary">
-              The assistant analyses supplied records. It cannot authorize targets or confirm
-              findings.
+              The assistant helps you reason about saved records. Testing permission and finding
+              confirmation still need the appropriate human decisions.
             </p>
           </ResearchSection>
           <ResearchSection
@@ -305,9 +314,9 @@ export function AiWorkspace({
             title="Conversation history"
             help={{
               description:
-                "Conversations retain the investigation's user and assistant messages. Guided questions use this history alongside saved research context; summaries help preserve the working research thread.",
+                "Your questions and the assistant's replies stay with the investigation. Guided mode uses that conversation alongside saved research, so follow-up questions can build on earlier discussion.",
               example:
-                "Keep follow-up questions about the same hypothesis in one conversation, and start another for a distinct line of research.",
+                "Keep questions about the same idea in one conversation. Start a new one when you're exploring a different question.",
             }}
           >
             {!archived ? (
@@ -351,7 +360,7 @@ export function AiWorkspace({
             </TabsList>
             <TabsContent value="guided">
               <p className="mb-6 max-w-2xl text-sm leading-relaxed text-text-secondary">
-                Ask a focused question, examine the reasoning, and decide what to verify next.
+                Ask one focused question, check the reasoning, and choose what to verify next.
               </p>
               {selectedConversation ? (
                 <ResearchSection
@@ -370,7 +379,7 @@ export function AiWorkspace({
                   ) : (
                     <EmptyState
                       title="Ready for your first question"
-                      description="The assistant will use this investigation’s saved context. Ask what the observations support or what information is still missing."
+                      description="Start with a question about your saved observations or what evidence is missing. The assistant will use this investigation's context to help you think it through."
                     />
                   )}
                   {!archived ? (
@@ -386,7 +395,7 @@ export function AiWorkspace({
               ) : (
                 <EmptyState
                   title="Start with a research question"
-                  description="Create a conversation from the history panel, then ask about this investigation’s observations, hypotheses, or next steps."
+                  description="Create a conversation in the history panel, then ask about an observation, a hypothesis, or your next step."
                 />
               )}
             </TabsContent>
@@ -394,21 +403,21 @@ export function AiWorkspace({
               <div className="flex flex-col gap-8">
                 <ResearchSection
                   id="bounded-analysis"
-                  title="Bounded research tasks"
+                  title="Focused research tasks"
                   help={{
                     description:
-                      "Guided mode answers a focused question in conversation. Delegated mode records analytical tasks or staged analysis over supplied investigation material. Both return proposals for review.",
+                      "Use Guided mode to talk through a question. Use Delegated mode for a focused task or staged analysis of saved research. Check the suggestions from either mode before using them.",
                     example:
-                      "Use guided mode to ask what an observation supports, or delegated analysis for a structured review of context, evidence, or hypotheses.",
-                    note: "AI cannot autonomously test targets, confirm findings, or approve reports. Review sources and uncertainty before adoption.",
+                      "Ask Guided mode what an observation supports. Try Delegated mode when you want a structured review of context, evidence, or hypotheses.",
+                    note: "Review the sources and uncertainty before adopting a suggestion. AI can't test targets on its own, confirm findings, or approve reports.",
                   }}
-                  description="Run one analysis against saved investigation context. Review the result before incorporating it into your research."
+                  description="Choose an analysis to run on the saved investigation. When it's finished, review the result before bringing it into your research."
                 >
                   <div className="flex flex-col gap-5">
                     <div className="flex flex-col gap-2">
                       <p className="text-sm text-text-secondary">
-                        Separate supplied information from unknowns and identify observations for
-                        review.
+                        Sort what&apos;s known from what&apos;s missing, and suggest observations
+                        for you to review.
                       </p>
                       <ReconAnalysisForm
                         key={
@@ -423,8 +432,8 @@ export function AiWorkspace({
                     </div>
                     <div className="flex flex-col gap-2">
                       <p className="text-sm text-text-secondary">
-                        Propose hypotheses with reasoning, supporting references, and missing
-                        information.
+                        Suggest hypotheses, explain the reasoning, and point out the evidence still
+                        needed.
                       </p>
                       <HypothesisGenerationForm
                         key={
@@ -440,7 +449,8 @@ export function AiWorkspace({
                     </div>
                     <div className="flex flex-col gap-2">
                       <p className="text-sm text-text-secondary">
-                        Save an AI-generated summary of completed work and suggested next actions.
+                        Draft a summary of the work so far and possible next steps for you to
+                        review.
                       </p>
                       <AiSessionSummaryForm
                         key={
@@ -454,7 +464,7 @@ export function AiWorkspace({
                     </div>
                   </div>
                 </ResearchSection>
-                <ResearchSection id="structured-results" title="Structured research output">
+                <ResearchSection id="structured-results" title="Analysis results">
                   {results.length ? (
                     results.map((task) => (
                       <article key={task.id} className="research-record">
@@ -484,7 +494,7 @@ export function AiWorkspace({
                   ) : (
                     <EmptyState
                       title="No structured results recorded"
-                      description="Run a bounded task to receive a research note with references, uncertainty, and proposed next actions."
+                      description="Choose a task above to get a research note with sources, open questions, and suggested next steps. Review it before relying on it."
                     />
                   )}
                 </ResearchSection>

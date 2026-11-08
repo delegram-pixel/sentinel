@@ -18,7 +18,10 @@ export async function GET(
   );
 
   if (!result) {
-    return new Response("This report is not available for export.", { status: 404 });
+    return new Response(
+      "This report isn't ready to export. Open it in Reports to check its approval and source readiness.",
+      { status: 404 },
+    );
   }
 
   return new Response(result.body as BodyInit, {

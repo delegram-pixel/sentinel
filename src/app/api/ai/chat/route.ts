@@ -69,7 +69,8 @@ export async function POST(request: Request): Promise<Response> {
         send({
           type: "error",
           code: "AI_PROVIDER_ERROR",
-          message: "The AI request could not be completed.",
+          message:
+            "We couldn't finish the AI request. Check task history for its status before trying again.",
         });
       } finally {
         controller.close();

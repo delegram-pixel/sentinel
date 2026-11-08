@@ -109,7 +109,7 @@ export function EvidenceUploadForm({
     }
 
     if (selected.size > MAX_EVIDENCE_BYTES) {
-      setError("Evidence files must be 25 MB or smaller.");
+      setError("This file is too large. Choose an evidence file of 25 MB or less.");
     }
 
     const inferred = inferMime(selected);
@@ -139,7 +139,9 @@ export function EvidenceUploadForm({
     }
 
     if (!redactionConfirmed) {
-      setError("Review the file and confirm that sensitive information was removed.");
+      setError(
+        "Check the file for sensitive information, remove or obscure it, then confirm the redaction review to continue.",
+      );
       return;
     }
 
@@ -152,12 +154,12 @@ export function EvidenceUploadForm({
           : new Uint8Array(await file.arrayBuffer());
 
       if (bytes.byteLength === 0) {
-        setError("The file is empty.");
+        setError("This file is empty. Choose a file with content to upload.");
         return;
       }
 
       if (bytes.byteLength > MAX_EVIDENCE_BYTES) {
-        setError("Evidence files must be 25 MB or smaller.");
+        setError("This file is too large. Choose an evidence file of 25 MB or less.");
         return;
       }
 
@@ -195,7 +197,7 @@ export function EvidenceUploadForm({
       });
 
       if (!upload.ok) {
-        setError("The file could not be uploaded. Try again.");
+        setError("We couldn't upload this file. Try the upload again.");
         return;
       }
 
@@ -212,7 +214,7 @@ export function EvidenceUploadForm({
       router.push(`/dashboard/evidence/${intent.evidenceId}`);
       router.refresh();
     } catch {
-      setError("The upload failed unexpectedly. Try again.");
+      setError("Something interrupted the upload. Try again when you're ready.");
     } finally {
       setPending(false);
     }
@@ -221,13 +223,8 @@ export function EvidenceUploadForm({
   return (
     <ResearchSection
       id="evidence-upload-form"
-      title="File and provenance"
-      description={
-        <>
-          Files upload to private quarantine storage for {investigationTitle}. They become available
-          to findings and AI context only after a human reviewer resolves redaction.
-        </>
-      }
+      title="File and source"
+      description={`Add supporting files to ${investigationTitle}. They're kept in private quarantine until a human reviewer resolves redaction, before they can support findings or enter AI context.`}
     >
       <form onSubmit={handleSubmit} aria-busy={pending} className="form-stack">
         <FieldGroup>
@@ -245,7 +242,7 @@ export function EvidenceUploadForm({
                 onChange={(event) => void handleFileChange(event.target.files?.[0] ?? null)}
               />
               <FieldDescription id="evidence-file-help">
-                PNG, JPEG, WebP, PDF, text, CSV, JSON, XML, or NDJSON. Maximum 25 MB.
+                Choose a PNG, JPEG, WebP, PDF, text, CSV, JSON, XML, or NDJSON file, up to 25 MB.
               </FieldDescription>
             </Field>
 
@@ -302,10 +299,10 @@ export function EvidenceUploadForm({
                 htmlFor="evidence-source"
                 help={{
                   description:
-                    "Explain where this material originated and how it relates to the investigation. Keep enough provenance for a reviewer to trace the original observation.",
+                    "Say where the material came from and how it relates to the question. Give the reviewer enough detail to trace it back to the original observation.",
                   example:
-                    "A response capture from the local lab, collected during the access-control investigation; record the capture date and collection method in the description.",
-                  note: "A filename alone rarely explains who collected the material or what it demonstrates.",
+                    "For a lab response capture, note the investigation, capture date, and how you collected it.",
+                  note: "A filename is a start. Add who collected the file and what it helps demonstrate.",
                 }}
               >
                 Source
@@ -339,10 +336,10 @@ export function EvidenceUploadForm({
                 htmlFor="evidence-text"
                 help={{
                   description:
-                    "Review the text that will be uploaded and remove secrets or personal information before confirming the redaction review.",
+                    "Read the text you'll upload and remove secrets or personal information. Then confirm that you've checked the redaction.",
                   example:
-                    "Replace access tokens, session cookies, email addresses, and unnecessary account identifiers while retaining the parts needed to understand the observation.",
-                  note: "Upload validation, human evidence approval, and AI-safe review remain separate checks.",
+                    "Remove or obscure tokens, cookies, email addresses, and unnecessary account IDs. Keep the details needed to understand the observation.",
+                  note: "Upload validation checks the file. Human evidence approval and AI-safe review are separate steps you'll still need to complete.",
                 }}
               >
                 Redaction review
@@ -357,8 +354,8 @@ export function EvidenceUploadForm({
                 className="min-h-48"
               />
               <FieldDescription>
-                Remove secrets, tokens, credentials, and personal data. The text above is exactly
-                what will be uploaded and scanned by the server.
+                Remove secrets, tokens, credentials, and personal data before uploading. The text
+                shown above is what the upload check will inspect.
               </FieldDescription>
             </Field>
           ) : null}

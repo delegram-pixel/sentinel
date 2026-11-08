@@ -59,7 +59,7 @@ async function EditFindingContent({ params }: EditFindingPageProps) {
   return (
     <FormPage
       title="Edit finding"
-      description={investigation.title}
+      description={`Refine this finding from ${investigation.title}. Keep the description, severity, and affected asset clear so a reviewer can follow your reasoning.`}
       backHref={`/dashboard/findings/${finding.id}`}
       backLabel="Back to finding"
     >

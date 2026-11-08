@@ -131,7 +131,7 @@ export function ObservationForm(props: ObservationFormProps) {
             required
             rows={4}
             maxLength={5000}
-            placeholder="Record what you observed, not what you think it means."
+            placeholder="What did you see? Save possible explanations as hypotheses."
             defaultValue={state.values.description}
             aria-invalid={Boolean(state.fieldErrors?.description)}
             aria-describedby={

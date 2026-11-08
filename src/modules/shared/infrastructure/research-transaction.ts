@@ -36,7 +36,7 @@ export async function lockResearchInvestigation(
   if (!investigation)
     throw new ResearchOperationError(
       "NOT_FOUND",
-      "That investigation does not exist in this workspace.",
+      "We can't find that investigation in this workspace. Open Investigations to choose an available one.",
     );
   if (investigation.status === "ARCHIVED" || investigation.project.status === "ARCHIVED")
     throw new ResearchOperationError("ARCHIVED", "Archived research cannot be changed.");

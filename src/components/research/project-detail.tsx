@@ -29,7 +29,15 @@ export function ProjectDetailView({
     <div className="page-stack">
       <PageHeader
         title={project.name}
-        description={project.description ?? "No description recorded."}
+        description={
+          <>
+            <p>
+              See how this project&apos;s research fits together. Review its targets and their
+              scope, then open an investigation to follow a question or pick up earlier work.
+            </p>
+            {project.description ? <p className="mt-3">{project.description}</p> : null}
+          </>
+        }
         metadata={
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <ProjectStatusBadge status={project.status} />
@@ -63,8 +71,7 @@ export function ProjectDetailView({
       {!canEdit ? (
         <Alert role="note">
           <AlertDescription>
-            This project is archived. Its research history remains available, and its records cannot
-            be changed.
+            This project is archived. You can still browse its research history; editing is closed.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -145,7 +152,7 @@ export function ProjectNotFoundNote() {
   return (
     <EmptyState
       title="Project not found"
-      description="This project is unavailable in your workspace."
+      description="We can't open this project in your workspace. Return to Projects to choose an available one."
       action={
         <Button asChild>
           <Link href="/dashboard/projects">Back to projects</Link>

@@ -185,8 +185,8 @@ export function RedactionReviewForm({
   if (!isReviewer) {
     return (
       <p className="text-sm text-text-secondary">
-        A workspace owner, admin, or reviewer must resolve redaction before this evidence can be
-        used.
+        Ask a workspace owner, admin, or reviewer to complete the redaction review before using this
+        evidence.
       </p>
     );
   }
@@ -212,7 +212,7 @@ export function RedactionReviewForm({
             id="redaction-note"
             name="note"
             className="min-h-20"
-            placeholder="Required when rejecting. Never paste the sensitive value here."
+            placeholder="If you're rejecting the file, explain why. Describe the sensitive information without pasting the value itself."
           />
         </Field>
 
@@ -246,7 +246,7 @@ export function EvidenceLinkToFindingForm({
   if (findings.length === 0) {
     return (
       <p className="text-sm text-text-secondary">
-        Create a finding in this investigation before linking evidence.
+        Create a finding in this investigation first, then come back to connect the evidence.
       </p>
     );
   }
@@ -348,8 +348,8 @@ export function DeleteEvidenceForm({
     <Disclosure title="Delete evidence">
       <Alert variant="warning">
         <AlertDescription>
-          Deleting removes the stored file. Unlink it from findings first. This action cannot be
-          undone from the workspace.
+          This deletes the stored file. Remove its finding links first and check that you no longer
+          need it. You can&apos;t undo deletion from the workspace.
         </AlertDescription>
       </Alert>
       <form ref={formRef} action={formAction} aria-busy={pending} className="mt-5">

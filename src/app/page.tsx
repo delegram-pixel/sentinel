@@ -6,30 +6,35 @@ import { Separator } from "@/components/ui/separator";
 const RECORD_PARTS = [
   {
     title: "Research context",
-    description: "The project, target, and authorization that define the work.",
+    description:
+      "Start with the project, the asset you're exploring, and your permission to research it.",
   },
-  { title: "Observations", description: "What you saw, with a source and confidence recorded." },
+  {
+    title: "Observations",
+    description: "Save what you saw, where it came from, and how confident you are about it.",
+  },
   {
     title: "Hypotheses",
-    description: "What the observations might mean, and what is still missing.",
+    description: "Explore what the clues might mean and what evidence would help you decide.",
   },
   {
     title: "Human review",
-    description: "The decisions that turn a suspected issue into a finding.",
+    description:
+      "Have a human reviewer check the evidence and decide whether the suspected issue is a finding.",
   },
 ];
 const PRINCIPLES = [
   {
     title: "Scope gives research its boundaries",
-    body: "Record the assets, permitted activities, and effective window. Authorization remains an explicit human attestation.",
+    body: "Record which assets and activities are allowed, and when permission applies. You explicitly attest to that permission before using the scope.",
   },
   {
     title: "Keep the reasoning traceable",
-    body: "Connect observations to hypotheses. Record supporting and contradicting information, open questions, and the next step.",
+    body: "Connect what you saw to what you suspect. Keep supporting and conflicting evidence, open questions, and the next step together.",
   },
   {
     title: "Use AI with a clear point of view",
-    body: "Ask contextual questions or run a bounded analysis. AI-generated interpretations remain distinct from your research and human decisions.",
+    body: "Ask AI about your saved research or run a focused analysis. Review its suggestions against the evidence before making a human decision.",
   },
 ];
 
@@ -51,8 +56,9 @@ export default function Home() {
               Evidence, not assertions.
             </h1>
             <p className="mt-7 max-w-lg text-base leading-relaxed text-text-secondary">
-              A focused workspace for professional security research. Keep what was authorized, what
-              was observed, and what still needs verification in one clear research record.
+              Give your security research a place to come together. Record your permission, follow
+              the clues, and keep the evidence and open questions close so you can explain what you
+              found.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">

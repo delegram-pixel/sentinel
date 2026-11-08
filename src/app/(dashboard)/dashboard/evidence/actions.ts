@@ -79,7 +79,11 @@ export async function updateEvidenceMetadataAction(
   };
 
   if (!evidenceId) {
-    return { status: "error", message: "The evidence identifier is missing.", values };
+    return {
+      status: "error",
+      message: "We couldn't identify the evidence. Reopen it from Evidence, then try again.",
+      values,
+    };
   }
 
   const parsed = evidenceMetadataUpdateSchema.safeParse(values);
@@ -87,7 +91,7 @@ export async function updateEvidenceMetadataAction(
   if (!parsed.success) {
     return {
       status: "error",
-      message: "Check the highlighted fields and try again.",
+      message: "A few details need attention. Check the highlighted fields, then try again.",
       fieldErrors: toFieldErrors(parsed.error.issues, METADATA_FIELDS),
       values,
     };
@@ -120,7 +124,10 @@ export async function reviewEvidenceAction(
   const note = stringValue(formData, "note");
 
   if (!evidenceId) {
-    return { status: "error", message: "The evidence identifier is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the evidence. Reopen it from Evidence, then try again.",
+    };
   }
 
   const parsed = redactionReviewSchema.safeParse({ decision, note });
@@ -158,7 +165,10 @@ export async function deleteEvidenceAction(
   const investigationId = stringValue(formData, "investigationId");
 
   if (!evidenceId) {
-    return { status: "error", message: "The evidence identifier is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the evidence. Reopen it from Evidence, then try again.",
+    };
   }
 
   const session = await getSessionContext();
@@ -188,7 +198,10 @@ export async function linkEvidenceAction(
   const relationshipType = stringValue(formData, "relationshipType");
 
   if (!evidenceId || !findingId) {
-    return { status: "error", message: "Choose a finding and relationship." };
+    return {
+      status: "error",
+      message: "Choose a finding and say how this evidence relates to it.",
+    };
   }
 
   const parsed = evidenceLinkSchema.safeParse({
@@ -198,7 +211,10 @@ export async function linkEvidenceAction(
   });
 
   if (!parsed.success) {
-    return { status: "error", message: "Choose a finding and relationship." };
+    return {
+      status: "error",
+      message: "Choose a finding and say how this evidence relates to it.",
+    };
   }
 
   const session = await getSessionContext();
@@ -227,7 +243,10 @@ export async function removeEvidenceLinkAction(
   const linkId = stringValue(formData, "linkId");
 
   if (!linkId) {
-    return { status: "error", message: "The evidence link is missing." };
+    return {
+      status: "error",
+      message: "We couldn't identify the evidence link. Reopen the record, then try again.",
+    };
   }
 
   const session = await getSessionContext();

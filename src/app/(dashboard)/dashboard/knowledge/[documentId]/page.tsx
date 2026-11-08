@@ -31,9 +31,14 @@ async function Content({ params }: { params: Promise<{ documentId: string }> }) 
     <div className="page-stack">
       <PageHeader
         title={row.title}
-        description={`${row.source.origin} · ${row.reviewStatus} · Version ${row.version}`}
+        description="Read the saved material and check where it came from. A human reviewer can approve it for AI context; related documents below help connect the dots."
+        metadata={
+          <p className="text-xs text-text-secondary">
+            {row.source.origin} · {row.reviewStatus} · Version {row.version}
+          </p>
+        }
       />
-      <ResearchSection id="knowledge-provenance" title="Provenance">
+      <ResearchSection id="knowledge-provenance" title="Source details">
         <p>Recorded by {row.creator.displayName}</p>
         <p>
           Published: {row.source.publishedAt?.toLocaleDateString() ?? "Unknown"} · Retrieved:{" "}

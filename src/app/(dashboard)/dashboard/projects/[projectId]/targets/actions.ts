@@ -68,7 +68,7 @@ function invalidState(
 ): TargetFormState {
   return {
     status: "error",
-    message: "Check the highlighted fields and try again.",
+    message: "A few details need attention. Check the highlighted fields, then try again.",
     fieldErrors: toFieldErrors(issues),
     values,
   };
@@ -82,7 +82,11 @@ export async function createTargetAction(
   const values = readValues(formData);
 
   if (!projectId) {
-    return { status: "error", message: "The project identifier is missing.", values };
+    return {
+      status: "error",
+      message: "We couldn't identify the project. Reopen it from Projects, then try again.",
+      values,
+    };
   }
 
   const parsed = targetInputSchema.safeParse(values);
@@ -122,7 +126,12 @@ export async function updateTargetAction(
   const values = readValues(formData);
 
   if (!projectId || !targetId) {
-    return { status: "error", message: "The target identifier is missing.", values };
+    return {
+      status: "error",
+      message:
+        "We couldn't identify the target. Reopen it from the project's Targets page, then try again.",
+      values,
+    };
   }
 
   const parsed = targetInputSchema.safeParse(values);
@@ -136,7 +145,12 @@ export async function updateTargetAction(
   const existing = await store.findTarget(session.workspace.id, targetId);
 
   if (!existing || existing.projectId !== projectId) {
-    return { status: "error", message: "That target does not exist in this project.", values };
+    return {
+      status: "error",
+      message:
+        "We can't find that target in this project. Choose one from the project's Targets page.",
+      values,
+    };
   }
 
   const result = await updateTarget(
