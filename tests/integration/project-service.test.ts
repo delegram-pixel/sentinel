@@ -109,7 +109,7 @@ describe("project service", () => {
     expect(result.update).toEqual({
       ok: false,
       code: "PROJECT_ARCHIVED",
-      message: "An archived project cannot be edited.",
+      message: "This project is archived. You can revisit its history, but editing is closed.",
     });
   });
 
