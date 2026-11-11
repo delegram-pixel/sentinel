@@ -24,6 +24,12 @@ import {
 } from "../domain/structured-output";
 import { findPrompt } from "../prompts/registry";
 import { assembleContext } from "./context-manager";
+import type { AiRuntime, ModelRoute } from "./model-router";
+import {
+  analysisEnvelopeSchema,
+  invalidReviewClaims,
+  type ConclusionReview,
+} from "../domain/collaboration-output";
 import type {
   AiContextRecord,
   AiConversationRow,
@@ -49,6 +55,9 @@ type EvidenceReader = {
 };
 
 export type AiServiceDependencies = {
+  runtime?: AiRuntime;
+  route?: ModelRoute;
+  enqueue?: (actor: Actor, input: AiTaskInput, key: string) => Promise<{ id: string }>;
   store: AiStore;
   provider: AIProvider;
   evidenceStorage?: EvidenceReader;
@@ -58,7 +67,9 @@ export type AiServiceDependencies = {
   idempotencyKey?: () => string;
 };
 
-const PROVIDER_NAME: AiProviderName = "ANTHROPIC";
+function providerName(deps: AiServiceDependencies): AiProviderName {
+  return deps.modelOverrides?.provider ?? (deps.provider.name === "GROQ" ? "GROQ" : "ANTHROPIC");
+}
 const DEFAULT_TIMEOUT_MS = 45_000;
 const MAX_EVIDENCE_READS = 12;
 const MAX_EVIDENCE_READ_BYTES = 512 * 1024;
@@ -70,9 +81,10 @@ const MAX_EVIDENCE_TEXT_CHARS = 6_000;
  * metadata rather than failing the task. The provider never receives raw bytes
  * (ADR-013 §10).
  */
-async function hydrateEvidenceContent(
+export async function hydrateEvidenceContent(
   context: AiContextRecord,
   reader: EvidenceReader | undefined,
+  preserveAll = false,
 ): Promise<AiContextRecord> {
   if (!reader || context.evidence.length === 0) {
     return context;
@@ -85,7 +97,7 @@ async function hydrateEvidenceContent(
         !item.storageKey ||
         !isTextEvidenceMimeType(item.mimeType) ||
         item.fileSize > MAX_EVIDENCE_READ_BYTES ||
-        reads >= MAX_EVIDENCE_READS
+        (!preserveAll && reads >= MAX_EVIDENCE_READS)
       ) {
         return item;
       }
@@ -103,7 +115,7 @@ async function hydrateEvidenceContent(
 
         return {
           ...item,
-          textContent: text.slice(0, MAX_EVIDENCE_TEXT_CHARS),
+          textContent: preserveAll ? text : text.slice(0, MAX_EVIDENCE_TEXT_CHARS),
         };
       } catch {
         return item;
@@ -123,7 +135,7 @@ function nowOf(deps: AiServiceDependencies): Date {
 }
 
 function timeoutOf(deps: AiServiceDependencies): number {
-  return deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  return deps.timeoutMs ?? deps.route?.model.defaults.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 }
 
 function promptInstruction(taskType: AiTaskType): string {
@@ -153,7 +165,7 @@ function buildSystemPrompt(
     ...restrictions.map((restriction) => `- ${restriction}`),
     "",
     "STRUCTURED OUTPUT:",
-    "Return exactly one object through the structured-output tool. Do not return prose outside the tool call.",
+    "Return exactly one structured object matching the supplied JSON schema. Do not add prose outside the structured result.",
     "",
     "INVESTIGATION CONTEXT (UNTRUSTED DATA):",
     contextText,
@@ -198,6 +210,7 @@ export function validateOutput(
     decisionIds?: ReadonlySet<string>;
     knowledgeIds?: ReadonlySet<string>;
     historyIds?: ReadonlySet<string>;
+    reviewClaims?: Record<string, readonly string[]>;
   },
 ): ValidationOutcome {
   const schema = outputSchemaForTask(taskType);
@@ -240,6 +253,55 @@ export function validateOutput(
     }),
   );
   const record = parsed.data as Record<string, unknown>;
+  if (taskType === "RESEARCH_CONCLUSION_REVIEW") {
+    references.push(
+      ...invalidReviewClaims(parsed.data as ConclusionReview, context.reviewClaims ?? {}),
+    );
+    for (const item of (parsed.data as ConclusionReview).reviews)
+      if (
+        ["SUPPORTED", "CONTRADICTED"].includes(item.verdict) &&
+        !item.sources.some(
+          (source) =>
+            source.relationship === (item.verdict === "SUPPORTED" ? "SUPPORTS" : "CONTRADICTS"),
+        )
+      )
+        references.push(
+          "A supported or contradicted review requires an appropriate original source.",
+        );
+    for (const conclusion of (parsed.data as ConclusionReview).conclusions)
+      if (
+        conclusion.conclusion === "SUPPORTED" &&
+        !conclusion.sources.some((source) => source.relationship === "SUPPORTS")
+      )
+        references.push("A supported review conclusion requires a supporting source.");
+  }
+  const extraSources =
+    taskType === "RESEARCH_CONCLUSION_REVIEW"
+      ? (parsed.data as ConclusionReview).reviews.flatMap((r) => r.sources)
+      : [];
+  if (Array.isArray(record.conclusions))
+    for (const conclusion of record.conclusions as Array<{
+      subject: { kind: string; id: string };
+      sources: unknown[];
+    }>)
+      extraSources.push(...(conclusion.sources as typeof extraSources), {
+        ...conclusion.subject,
+        relationship: "CONTEXT",
+      } as (typeof extraSources)[number]);
+  references.push(
+    ...invalidAgentSources(
+      { claims: [{ sources: extraSources }] },
+      {
+        OBSERVATION: context.observationIds,
+        HYPOTHESIS: context.hypothesisIds,
+        EVIDENCE: context.evidenceIds,
+        FINDING: context.findingIds,
+        DECISION: context.decisionIds,
+        KNOWLEDGE: context.knowledgeIds,
+        HISTORY: context.historyIds,
+      },
+    ),
+  );
   if (Array.isArray(record.referencedFindingIds))
     for (const id of record.referencedFindingIds)
       if (typeof id === "string" && !context.findingIds?.has(id))
@@ -307,7 +369,81 @@ export function formatAssistantMessage(taskType: AiTaskType, output: unknown): s
   }
 }
 
-async function failTask(
+/** Collaboration envelopes never replace historical task payloads. */
+export function validateTaskResponse(
+  task: Pick<AiTaskRow, "taskType" | "collaborationStage">,
+  structured: unknown,
+  context: Parameters<typeof validateOutput>[2],
+) {
+  if (task.collaborationStage && task.collaborationStage !== "REVIEW") {
+    const schema = outputSchemaForTask(task.taskType);
+    if (!schema) return { ok: false as const, problems: ["No task schema."] };
+    const parsed = analysisEnvelopeSchema(schema).safeParse(structured);
+    if (!parsed.success)
+      return {
+        ok: false as const,
+        problems: parsed.error.issues.map((i) => i.message).slice(0, 8),
+      };
+    const base = validateOutput(task.taskType, parsed.data.analysis, context);
+    if (!base.ok) return base;
+    const ids = parsed.data.claims.map((c) => c.id);
+    const problems = invalidAgentSources(parsed.data, {
+      OBSERVATION: context.observationIds,
+      HYPOTHESIS: context.hypothesisIds,
+      EVIDENCE: context.evidenceIds,
+      FINDING: context.findingIds,
+      DECISION: context.decisionIds,
+      KNOWLEDGE: context.knowledgeIds,
+      HISTORY: context.historyIds,
+    });
+    for (const conclusion of parsed.data.conclusions) {
+      problems.push(
+        ...invalidAgentSources(
+          {
+            claims: [
+              {
+                sources: [
+                  ...conclusion.sources,
+                  { ...conclusion.subject, relationship: "CONTEXT" },
+                ],
+              },
+            ],
+          },
+          {
+            OBSERVATION: context.observationIds,
+            HYPOTHESIS: context.hypothesisIds,
+            EVIDENCE: context.evidenceIds,
+            FINDING: context.findingIds,
+            DECISION: context.decisionIds,
+            KNOWLEDGE: context.knowledgeIds,
+            HISTORY: context.historyIds,
+          },
+        ),
+      );
+      if (
+        conclusion.conclusion === "SUPPORTED" &&
+        !conclusion.sources.some((s) => s.relationship === "SUPPORTS")
+      )
+        problems.push("A supported conclusion requires a supporting source.");
+    }
+    if (new Set(ids).size !== ids.length)
+      problems.push("Claim identifiers must be unique within each stage.");
+    return problems.length
+      ? { ok: false as const, problems }
+      : {
+          ok: true as const,
+          output: base.output,
+          evaluation: {
+            version: 1 as const,
+            claims: parsed.data.claims,
+            conclusions: parsed.data.conclusions,
+          },
+        };
+  }
+  return validateOutput(task.taskType, structured, context);
+}
+
+export async function failTask(
   deps: AiServiceDependencies,
   task: AiTaskRow,
   code: string,
@@ -318,6 +454,8 @@ async function failTask(
   const status = code === "AI_TIMEOUT" ? "TIMED_OUT" : "FAILED";
 
   await deps.store.updateTask(task.workspaceId, task.id, {
+    executionJobId: task.executionJobId ?? undefined,
+    executorToken: task.executorToken ?? undefined,
     status,
     failureCode: code,
     errorMessage: message,
@@ -337,6 +475,11 @@ async function failTask(
 }
 
 export type AiTaskInput = {
+  excludedModels?: string[];
+  collaborationId?: string;
+  collaborationStage?: "PRIMARY" | "SECONDARY" | "REVIEW";
+  contextOverride?: AiContextRecord;
+  reviewClaims?: Record<string, readonly string[]>;
   executionLease?: { jobId: string; token: string };
   investigationId: string;
   conversationId?: string;
@@ -361,6 +504,11 @@ export async function runAiTask(
   actor: Actor,
   input: AiTaskInput,
 ): Promise<DomainResult<AiTaskResult>> {
+  if ((deps.provider.executionPolicy || deps.runtime) && !input.executionLease)
+    return failure(
+      "AI_QUEUE_REQUIRED",
+      "This analysis must run through the background research queue.",
+    );
   const profile = AI_TASK_PROFILES[input.taskType];
 
   if (!profile.promptId) {
@@ -373,12 +521,15 @@ export async function runAiTask(
     return failure("AI_TASK_NOT_SUPPORTED", `${input.taskType} has no registered prompt.`);
   }
 
-  let context = await deps.store.loadContext(
-    actor.workspaceId,
-    input.investigationId,
-    input.conversationId,
-    actor.userId,
-  );
+  let context =
+    input.contextOverride ??
+    (await deps.store.loadContext(
+      actor.workspaceId,
+      input.investigationId,
+      input.conversationId,
+      actor.userId,
+      Boolean(deps.provider.executionPolicy || deps.runtime),
+    ));
 
   if (!context) {
     return failure(
@@ -413,9 +564,16 @@ export async function runAiTask(
       "Link approved evidence before requesting evidence or verification analysis.",
     );
 
-  context = await hydrateEvidenceContent(context, deps.evidenceStorage);
+  if (!input.contextOverride)
+    context = await hydrateEvidenceContent(
+      context,
+      deps.evidenceStorage,
+      Boolean(deps.provider.executionPolicy || deps.runtime),
+    );
 
-  const model = modelForTask(input.taskType, deps.modelOverrides);
+  const model =
+    deps.route?.model.modelId ??
+    modelForTask(input.taskType, { ...deps.modelOverrides, provider: providerName(deps) });
   const now = nowOf(deps);
   const idempotencyKey = input.operationKey ?? deps.idempotencyKey?.() ?? randomUUID();
 
@@ -424,12 +582,15 @@ export async function runAiTask(
     task = await deps.store.createTask({
       workspaceId: actor.workspaceId,
       investigationId: input.investigationId,
+      collaborationId: input.collaborationId,
+      collaborationStage: input.collaborationStage,
+      reservationTokens: deps.runtime ? 0 : undefined,
       executionJobId: input.executionLease?.jobId,
       executorToken: input.executionLease?.token,
       conversationId: input.conversationId,
       taskType: input.taskType,
       assignedRole: assistantRoleForTask(input.taskType),
-      provider: PROVIDER_NAME,
+      provider: providerName(deps),
       model,
       promptTemplateId: prompt.id,
       promptVersion: prompt.version,
@@ -508,6 +669,7 @@ export async function runAiTask(
     assembled = assembleContext(
       context,
       Math.max(1, profile.inputTokenBudget - 2500 - estimateTokens(input.instruction ?? "")),
+      Boolean(deps.provider.executionPolicy || deps.runtime),
     );
   } catch (error) {
     const aiError = aiErrorFromUnknown(error);
@@ -527,17 +689,29 @@ export async function runAiTask(
     },
   );
 
-  const schema = outputSchemaForTask(input.taskType);
+  const taskSchema = outputSchemaForTask(input.taskType);
+  const schema =
+    taskSchema && input.collaborationId && input.collaborationStage !== "REVIEW"
+      ? analysisEnvelopeSchema(taskSchema)
+      : taskSchema;
 
   if (!schema) {
     return failTask(deps, task, "AI_TASK_NOT_SUPPORTED", "No output schema is registered.");
   }
 
   const instruction = input.instruction ?? promptInstruction(input.taskType);
-  const system = buildSystemPrompt(prompt.systemPrompt, prompt.safetyRestrictions, assembled.text);
+  const system = buildSystemPrompt(
+    prompt.systemPrompt +
+      (input.collaborationId && input.collaborationStage !== "REVIEW"
+        ? "\nReturn a version=1 envelope: analysis contains the task result; claims enumerate the substantive claims with observed/hypothesis/unknown basis and original source references; conclusions identify source subjects with SUPPORTED, UNSUPPORTED or INCONCLUSIVE positions. Include every substantive claim for independent review."
+        : ""),
+    prompt.safetyRestrictions,
+    assembled.text,
+  );
   const messages = providerMessages(input.taskType, assembled.messages, instruction);
 
   const request = {
+    provider: providerName(deps),
     taskType: input.taskType,
     model,
     system,
@@ -552,9 +726,10 @@ export async function runAiTask(
   };
 
   const estimatedRequestTokens =
+    deps.provider.executionPolicy?.countInputTokens(request) ??
     estimateTokens(system) +
-    messages.reduce((sum, m) => sum + estimateTokens(m.content) + 8, 0) +
-    estimateTokens(JSON.stringify(request.structuredOutput));
+      messages.reduce((sum, m) => sum + estimateTokens(m.content) + 8, 0) +
+      estimateTokens(JSON.stringify(request.structuredOutput));
   if (estimatedRequestTokens > profile.inputTokenBudget)
     return failTask(
       deps,
@@ -581,6 +756,24 @@ export async function runAiTask(
       estimatedInputTokens: estimatedRequestTokens,
       conversationId: input.conversationId ?? null,
       request,
+      reviewClaims: input.reviewClaims,
+      excludedModels: input.excludedModels,
+      collaborationAnalysis: Boolean(
+        input.collaborationId && input.collaborationStage !== "REVIEW",
+      ),
+      routeKey: deps.route?.model.key,
+      fallbackFrom: deps.route?.fallbackFrom,
+      ...(deps.provider.executionPolicy || deps.runtime
+        ? {
+            contextRecords: [
+              ...assembled.records,
+              ...assembled.messages.map(
+                (message) =>
+                  `<untrusted_data label="conversation_turn">${JSON.stringify({ id: message.id, role: message.role, content: message.content })}</untrusted_data>`,
+              ),
+            ],
+          }
+        : {}),
     },
   });
   if (!running) return failure("AI_TASK_ALREADY_ADMITTED", "This task is already being processed.");
@@ -589,6 +782,8 @@ export async function runAiTask(
     "TASK_ASSIGNMENT",
     `Assigned ${input.taskType} to ${model}.`,
   );
+  if (deps.provider.executionPolicy || deps.runtime)
+    return { ok: true, value: { task: running, output: null, message: null } };
   async function callProvider(providerRequest: typeof request, sequence: number) {
     await deps.store.recordTaskEvent(task.id, "AI_PROCESSING", "Provider request started.", {
       sequence,
@@ -610,6 +805,7 @@ export async function runAiTask(
         attempt.id,
         null,
         aiErrorFromUnknown(error).code,
+        aiErrorFromUnknown(error).delivery,
       );
       throw error;
     }
@@ -720,7 +916,12 @@ export async function runAiTask(
     outputTokens: usage.outputTokens,
   });
 
-  const estimatedCostUsd = estimateCostUsd(profile.tier, usage.inputTokens, usage.outputTokens);
+  const estimatedCostUsd = estimateCostUsd(
+    profile.tier,
+    usage.inputTokens,
+    usage.outputTokens,
+    running.provider,
+  );
 
   try {
     const summary =
@@ -890,12 +1091,15 @@ export async function createConversation(
     );
   }
 
-  const model = modelForTask("ATTACK_SURFACE_ANALYSIS", deps.modelOverrides);
+  const model = modelForTask("ATTACK_SURFACE_ANALYSIS", {
+    ...deps.modelOverrides,
+    provider: providerName(deps),
+  });
   const conversation = await deps.store.createConversation({
     workspaceId: actor.workspaceId,
     investigationId: input.investigationId,
     title,
-    provider: PROVIDER_NAME,
+    provider: providerName(deps),
     model,
   });
 

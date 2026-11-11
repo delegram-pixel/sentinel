@@ -8,14 +8,12 @@ import { getDb } from "@/lib/db";
 import { getSessionContext } from "@/lib/session";
 import {
   createConversation,
-  runAiTask,
   type AiServiceDependencies,
 } from "@/modules/ai/application/task-service";
 import type { AiConversationRow } from "@/modules/ai/application/ports";
 import type { AiTaskType } from "@/modules/ai/domain/ai-config";
-import { PrismaAIStore } from "@/modules/ai/infrastructure/prisma-ai-store";
-import { aiModelOverrides, createAIProvider } from "@/modules/ai/infrastructure/provider-factory";
-import { createEvidenceStorage } from "@/modules/evidence/infrastructure/storage-factory";
+import { createAiDependencies } from "@/modules/ai/infrastructure/ai-dependencies";
+import { requestAiAnalysis } from "@/modules/ai/application/request-service";
 
 function aiPath(investigationId: string): string {
   return `/dashboard/investigations/${investigationId}/ai`;
@@ -26,12 +24,7 @@ function stringValue(formData: FormData, name: string): string {
 }
 
 function dependencies(): AiServiceDependencies {
-  return {
-    store: new PrismaAIStore(getDb()),
-    provider: createAIProvider(),
-    evidenceStorage: createEvidenceStorage(),
-    modelOverrides: aiModelOverrides(),
-  };
+  return createAiDependencies(getDb());
 }
 
 async function resolveConversation(
@@ -89,7 +82,7 @@ async function executeTask(
     session.user.id,
   );
 
-  const result = await runAiTask(
+  const result = await requestAiAnalysis(
     deps,
     { userId: session.user.id, workspaceId: session.workspace.id },
     {
@@ -221,7 +214,7 @@ export async function generateSessionSummaryAction(
 
   const session = await getSessionContext();
   const deps = dependencies();
-  const result = await runAiTask(
+  const result = await requestAiAnalysis(
     deps,
     { userId: session.user.id, workspaceId: session.workspace.id },
     {

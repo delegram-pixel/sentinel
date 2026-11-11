@@ -28,3 +28,14 @@ export type JobRow = {
 export function retryDelay(attempt: number): number {
   return Math.min(60000, 1000 * 2 ** Math.max(0, attempt - 1));
 }
+
+/** Healthy multi-step work yields its lease without consuming a failure retry. */
+export class JobContinuation extends Error {
+  constructor(
+    public readonly availableAt: Date,
+    public readonly progress: number,
+  ) {
+    super("Background work will continue after the provider quota permits it.");
+    this.name = "JobContinuation";
+  }
+}

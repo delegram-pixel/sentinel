@@ -18,7 +18,7 @@ const LOCAL_SECONDS = 5 * 60;
 const LOCAL_SIGNING_CONTEXT = "sentinel-local-evidence";
 
 export function localStorageRoot(): string {
-  return process.env.EVIDENCE_LOCAL_DIR?.trim() || path.join(process.cwd(), ".data", "evidence");
+  return getServerEnv().EVIDENCE_LOCAL_DIR || path.join(process.cwd(), ".data", "evidence");
 }
 
 function localSecret(): string {
@@ -94,11 +94,12 @@ function localUrl(operation: "upload" | "download", key: string): string {
 
 /**
  * Development-only filesystem adapter. It mirrors the two-step upload flow so
- * the UI and service can be exercised without an R2 bucket. Production uses
- * `S3EvidenceStorage`.
+ * the UI and service can be exercised without an UploadThing token. Production
+ * uses `UploadThingEvidenceStorage`.
  */
 export class LocalEvidenceStorage implements EvidenceStorage {
   readonly kind = "LOCAL" as const;
+  readonly promotionMode = "COPY" as const;
 
   async createUploadTarget(input: {
     key: string;

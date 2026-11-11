@@ -2,6 +2,12 @@
 
 This runbook uses the existing Next.js application, PostgreSQL database and private evidence-storage adapters. The worker runs the same application code and database; no microservice, target scanner or external submission system is introduced.
 
+## Multi-model rollout (ADR-034)
+
+[Multi-model intelligence](../AI-MULTI-MODEL.md) documents the exact models, account/privacy requirements and routing configuration. Apply the three additive `20261111` AI migrations before updating both application and worker. Keep `AI_ROUTING_MODE=LEGACY` for existing Groq behavior, or enable `MULTI_MODEL` with configured provider credentials. Missing providers do not stop unrelated research. Collaboration is explicitly requested from Tasks and incomplete stages remain visible in investigation AI history.
+
+Paid models require `AI_ALLOW_PAID_MODELS` and positive daily/job caps. Confirm provider privacy controls before enabling their attestations; paid Gemini requires acceptance of 55-day abuse-monitoring retention. OpenRouter requires contracted host slugs with native schema/ZDR support. Quotas are configured account limits, not free-tier guarantees. Correct rejected credentials, then reset the relevant `AIProviderQuota.disabled`, failure counter and cooldown before retrying. Uncertain delivery requires owner/admin ledger reconciliation; it never triggers automatic replay. `yarn ai:evaluate` performs offline deterministic checks without spending API credits.
+
 ## Production deployment
 
 Production is deployed from GitHub Actions after the quality, integration and end-to-end jobs pass on `main` (ADR-032). The deploy job pulls the Vercel Production environment, applies `yarn db:deploy` with that environment's `DATABASE_URL` and `DIRECT_URL`, builds a prebuilt Vercel output, then promotes it. A failed migration stops promotion. Vercel Git deployments are disabled for `main` in `vercel.json`; preview branches use a separate Neon branch and Preview environment. The worker still runs outside Vercel.
@@ -41,7 +47,7 @@ Replace `WORKSPACE_UUID` with the actual workspace UUID. The command emits proje
 
 ## Worker deployment
 
-The production web application and worker need matching database and private-storage configuration, including the same active/quarantine prefixes. Local filesystem storage requires shared access when used locally; use the existing private S3/R2 adapter for deployments with separate hosts or ephemeral filesystems.
+The production web application and worker need matching database and private-storage configuration, including the same `UPLOADTHING_TOKEN` and private UploadThing app. Local filesystem storage requires shared access when used locally; use the UploadThing adapter for deployments with separate hosts or ephemeral filesystems.
 
 ```sh
 yarn worker

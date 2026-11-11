@@ -20,11 +20,11 @@ import { PrismaAuthStore } from "@/modules/auth/infrastructure/prisma-auth-store
  * Refresh the profile from Clerk so missed webhooks do not leave stale account
  * details. React's cache deduplicates this work within a request only.
  */
-export const getSessionContext = cache(async (): Promise<SessionContext> => {
+async function loadSessionContext(): Promise<SessionContext | null> {
   const { userId } = await auth();
 
   if (!userId) {
-    redirect("/sign-in");
+    return null;
   }
 
   const store = new PrismaAuthStore(getDb());
@@ -39,4 +39,22 @@ export const getSessionContext = cache(async (): Promise<SessionContext> => {
   }
 
   return syncUserProfile(store, identity);
+}
+
+export const getSessionContext = cache(async (): Promise<SessionContext> => {
+  const session = await loadSessionContext();
+
+  if (!session) {
+    redirect("/sign-in");
+  }
+
+  return session;
 });
+
+/**
+ * Route-handler-safe variant for callbacks that must return an error instead of
+ * redirecting (for example the UploadThing middleware).
+ */
+export function getOptionalSessionContext(): Promise<SessionContext | null> {
+  return loadSessionContext();
+}

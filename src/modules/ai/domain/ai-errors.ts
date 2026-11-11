@@ -5,6 +5,10 @@
  */
 export const AI_ERROR_CODES = [
   "AI_NOT_CONFIGURED",
+  "AI_NO_COMPATIBLE_MODEL",
+  "AI_PRIVACY_NOT_APPROVED",
+  "AI_COST_LIMIT",
+  "AI_QUEUE_REQUIRED",
   "AI_PROVIDER_ERROR",
   "AI_RATE_LIMITED",
   "AI_TIMEOUT",
@@ -24,8 +28,13 @@ export const AI_ERROR_CODES = [
 export type AiErrorCode = (typeof AI_ERROR_CODES)[number];
 
 export const AI_ERROR_MESSAGES: Record<AiErrorCode, string> = {
+  AI_NO_COMPATIBLE_MODEL:
+    "No available model meets this task's capabilities and context requirements.",
+  AI_PRIVACY_NOT_APPROVED: "This provider is not approved to process confidential research here.",
+  AI_COST_LIMIT: "This request exceeds the configured AI spending policy.",
   AI_NOT_CONFIGURED:
     "AI isn't set up here yet. Ask the person managing this deployment to configure the provider.",
+  AI_QUEUE_REQUIRED: "This analysis must run through the background research queue.",
   AI_PROVIDER_ERROR:
     "The AI provider couldn't finish this request. Check task history before trying again.",
   AI_RATE_LIMITED:
@@ -59,12 +68,28 @@ export const AI_ERROR_MESSAGES: Record<AiErrorCode, string> = {
 export class AiError extends Error {
   readonly code: AiErrorCode;
   readonly retryable: boolean;
+  readonly retryAfterMs?: number;
+  readonly delivery: "REJECTED" | "UNCERTAIN";
 
-  constructor(code: AiErrorCode, message?: string, retryable = false) {
+  constructor(
+    code: AiErrorCode,
+    message?: string,
+    retryable = false,
+    retryAfterMs?: number,
+    delivery: "REJECTED" | "UNCERTAIN" = [
+      "AI_TIMEOUT",
+      "AI_PROVIDER_ERROR",
+      "AI_INVALID_OUTPUT",
+    ].includes(code)
+      ? "UNCERTAIN"
+      : "REJECTED",
+  ) {
     super(message ?? AI_ERROR_MESSAGES[code]);
     this.name = "AiError";
     this.code = code;
     this.retryable = retryable;
+    this.retryAfterMs = retryAfterMs;
+    this.delivery = delivery;
   }
 }
 

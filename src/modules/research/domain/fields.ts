@@ -56,14 +56,14 @@ export function optionalText(maxLength: number) {
   );
 }
 
-export function optionalHttpUrl(maxLength: number) {
+export function optionalHttpUrl(maxLength: number, message = "Enter an http(s) URL.") {
   return z.preprocess(
     (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
     z
       .string()
       .trim()
       .max(maxLength)
-      .refine((value) => /^https?:\/\/[^\s]+$/i.test(value), "Enter an http(s) URL.")
+      .refine((value) => /^https?:\/\/[^\s]+$/i.test(value), message)
       .optional(),
   );
 }

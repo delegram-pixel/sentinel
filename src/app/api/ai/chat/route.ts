@@ -3,9 +3,8 @@ import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { getSessionContext } from "@/lib/session";
 import { sendChatMessage, type AiServiceDependencies } from "@/modules/ai/application/task-service";
-import { PrismaAIStore } from "@/modules/ai/infrastructure/prisma-ai-store";
-import { aiModelOverrides, createAIProvider } from "@/modules/ai/infrastructure/provider-factory";
-import { createEvidenceStorage } from "@/modules/evidence/infrastructure/storage-factory";
+import { createAiDependencies } from "@/modules/ai/infrastructure/ai-dependencies";
+import { queueChatMessage, requiresAiQueue } from "@/modules/ai/application/request-service";
 
 const chatRequestSchema = z.object({
   operationKey: z.string().min(8).max(160),
@@ -15,12 +14,7 @@ const chatRequestSchema = z.object({
 });
 
 function dependencies(): AiServiceDependencies {
-  return {
-    store: new PrismaAIStore(getDb()),
-    provider: createAIProvider(),
-    evidenceStorage: createEvidenceStorage(),
-    modelOverrides: aiModelOverrides(),
-  };
+  return createAiDependencies(getDb());
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -46,8 +40,29 @@ export async function POST(request: Request): Promise<Response> {
       send({ type: "start", conversationId: parsed.data.conversationId });
 
       try {
+        const deps = dependencies();
+        if (requiresAiQueue(deps)) {
+          const result = await queueChatMessage(
+            deps,
+            { userId: session.user.id, workspaceId: session.workspace.id },
+            parsed.data.investigationId,
+            parsed.data.conversationId,
+            parsed.data.message,
+            parsed.data.operationKey,
+          );
+          send(
+            result.ok
+              ? {
+                  type: "queued",
+                  jobId: result.value.jobId,
+                  conversationId: parsed.data.conversationId,
+                }
+              : { type: "error", code: result.code, message: result.message },
+          );
+          return;
+        }
         const result = await sendChatMessage(
-          dependencies(),
+          deps,
           { userId: session.user.id, workspaceId: session.workspace.id },
           parsed.data.investigationId,
           parsed.data.conversationId,

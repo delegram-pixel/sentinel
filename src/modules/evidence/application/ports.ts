@@ -79,7 +79,7 @@ export type EvidenceCreateData = {
   fileSize: number;
   checksum: string;
   source?: string;
-  quarantineKey: string;
+  quarantineKey?: string | null;
   uploadedBy: string;
 };
 
@@ -134,6 +134,12 @@ export type EvidenceStore = {
     investigationId: string,
   ): Promise<EvidenceInvestigationContext | null>;
   createEvidence(data: EvidenceCreateData, audit: EvidenceAuditDraft): Promise<EvidenceRow>;
+  recordUploadedObject(
+    workspaceId: string,
+    evidenceId: string,
+    key: string,
+    audit: EvidenceAuditDraft,
+  ): Promise<boolean>;
   findEvidence(workspaceId: string, evidenceId: string): Promise<EvidenceDetail | null>;
   updateEvidenceMetadata(
     workspaceId: string,

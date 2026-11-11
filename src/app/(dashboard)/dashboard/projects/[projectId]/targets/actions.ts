@@ -11,7 +11,7 @@ import type {
 import { getDb } from "@/lib/db";
 import { getSessionContext } from "@/lib/session";
 import { createTarget, updateTarget } from "@/modules/research/application/target-service";
-import { targetInputSchema } from "@/modules/research/domain/target";
+import { targetInputSchema, targetUpdateInputSchema } from "@/modules/research/domain/target";
 import { PrismaResearchStore } from "@/modules/research/infrastructure/prisma-research-store";
 
 const TARGET_FIELDS: readonly TargetFormField[] = [
@@ -106,7 +106,13 @@ export async function createTargetAction(
   );
 
   if (!result.ok) {
-    return { status: "error", message: result.message, values };
+    return {
+      status: "error",
+      message: result.message,
+      fieldErrors:
+        result.code === "TARGET_DUPLICATE" ? { assetIdentifier: result.message } : undefined,
+      values,
+    };
   }
 
   revalidatePath("/dashboard");
@@ -114,7 +120,7 @@ export async function createTargetAction(
   revalidatePath(`/dashboard/projects/${projectId}`);
   revalidatePath(`/dashboard/projects/${projectId}/targets`);
 
-  redirect(`/dashboard/projects/${projectId}/targets/${result.value.id}`);
+  redirect(`/dashboard/projects/${projectId}/targets/${result.value.id}?registered=1`);
 }
 
 export async function updateTargetAction(
@@ -134,7 +140,7 @@ export async function updateTargetAction(
     };
   }
 
-  const parsed = targetInputSchema.safeParse(values);
+  const parsed = targetUpdateInputSchema.safeParse(values);
 
   if (!parsed.success) {
     return invalidState(values, parsed.error.issues);
@@ -162,7 +168,13 @@ export async function updateTargetAction(
   );
 
   if (!result.ok) {
-    return { status: "error", message: result.message, values };
+    return {
+      status: "error",
+      message: result.message,
+      fieldErrors:
+        result.code === "TARGET_DUPLICATE" ? { assetIdentifier: result.message } : undefined,
+      values,
+    };
   }
 
   revalidatePath("/dashboard");

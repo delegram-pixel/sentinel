@@ -129,10 +129,12 @@ describe("AI context manager", () => {
       {
         id: "77777777-7777-4777-8777-777777777777",
         version: 2,
+        checksum: "b".repeat(64),
       },
       {
         id: "88888888-8888-4888-8888-888888888888",
         version: 1,
+        checksum: "c".repeat(64),
       },
     ]);
     expect(assembled.text).toContain('<untrusted_data label="evidence id="');

@@ -1,7 +1,7 @@
 import { failure, type DomainResult } from "@/modules/shared/domain/result";
 
 import { parseDateOnly, startOfDayUtc } from "../domain/fields";
-import { targetInputSchema, type TargetInput } from "../domain/target";
+import { targetInputSchema, targetUpdateInputSchema, type TargetInput } from "../domain/target";
 import type {
   ProjectStore,
   TargetCreateData,
@@ -81,7 +81,7 @@ export async function createTarget(
   if (await targetStore.targetAssetExists(projectId, parsed.data.assetIdentifier)) {
     return failure(
       "TARGET_DUPLICATE",
-      "This asset is already registered in the project. Open the existing target to continue your research.",
+      "This asset identifier is already registered in this project. Open the existing target or enter a different identifier.",
     );
   }
 
@@ -109,7 +109,7 @@ export async function updateTarget(
   targetId: string,
   rawInput: unknown,
 ): Promise<DomainResult<{ id: string }>> {
-  const parsed = targetInputSchema.safeParse(rawInput);
+  const parsed = targetUpdateInputSchema.safeParse(rawInput);
 
   if (!parsed.success) {
     return failure("VALIDATION_FAILED", firstIssue(parsed));
@@ -146,7 +146,7 @@ export async function updateTarget(
   ) {
     return failure(
       "TARGET_DUPLICATE",
-      "Another target in this project uses that identifier. Check the existing target or enter a different asset.",
+      "This asset identifier is already registered in this project. Open the existing target or enter a different identifier.",
     );
   }
 

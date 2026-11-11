@@ -21,12 +21,23 @@ export type EvidenceDownloadTarget = {
   expiresAt: Date;
 };
 
+export type EvidenceStorageKind = "UPLOADTHING" | "LOCAL" | "MEMORY";
+
 /**
- * Storage boundary for evidence (ADR-019). Application code never imports an
- * S3 client directly; tests use an in-memory implementation.
+ * How an approved upload becomes active evidence.
+ * - `COPY`: copy quarantine → active key, then delete the original.
+ * - `IN_PLACE`: the quarantined object is already private and immutable, so
+ *   activation only changes its database state.
+ */
+export type EvidencePromotionMode = "COPY" | "IN_PLACE";
+
+/**
+ * Storage boundary for evidence (ADR-019). Application code never imports a
+ * provider SDK directly; tests use an in-memory implementation.
  */
 export interface EvidenceStorage {
-  readonly kind: "S3" | "LOCAL" | "MEMORY";
+  readonly kind: EvidenceStorageKind;
+  readonly promotionMode: EvidencePromotionMode;
   createUploadTarget(input: {
     key: string;
     mimeType: string;

@@ -1,0 +1,96 @@
+[
+  {
+    "id": "valid-gemini",
+    "provider": "GEMINI",
+    "model": "gemini-3.8-flash",
+    "taskType": "PATTERN_ANALYSIS",
+    "expectedValid": true,
+    "sources": {},
+    "output": { "patterns": [], "claims": [], "uncertaintyNotes": ["Synthetic evaluation only."] }
+  },
+  {
+    "id": "valid-groq",
+    "provider": "GROQ",
+    "model": "openai/gpt-oss-20b",
+    "taskType": "SESSION_SUMMARY",
+    "expectedValid": true,
+    "sources": {},
+    "output": {
+      "summary": "Synthetic evaluation only.",
+      "completedWork": [],
+      "rejectedHypotheses": [],
+      "unresolvedQuestions": ["Evidence still needs human review."],
+      "nextActions": []
+    }
+  },
+  {
+    "id": "invalid-schema-qwen",
+    "provider": "OPENROUTER",
+    "model": "qwen/qwen3.8-27b",
+    "taskType": "PATTERN_ANALYSIS",
+    "expectedValid": false,
+    "sources": {},
+    "output": { "patterns": "invalid" }
+  },
+  {
+    "id": "fabricated-reference",
+    "provider": "GEMINI",
+    "model": "gemini-3.8-flash",
+    "taskType": "PATTERN_ANALYSIS",
+    "expectedValid": false,
+    "sources": {},
+    "output": {
+      "patterns": [],
+      "uncertaintyNotes": [],
+      "claims": [
+        {
+          "id": "claim-fabricated",
+          "statement": "An unavailable observation establishes access.",
+          "basis": "OBSERVED",
+          "confidence": "low",
+          "limitations": [],
+          "sources": [
+            {
+              "kind": "OBSERVATION",
+              "id": "00000000-0000-4000-8000-000000000001",
+              "relationship": "SUPPORTS"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "unsupported-claim",
+    "provider": "OPENROUTER",
+    "model": "qwen/qwen3.8-27b",
+    "taskType": "PATTERN_ANALYSIS",
+    "expectedValid": false,
+    "sources": {},
+    "output": {
+      "patterns": [],
+      "uncertaintyNotes": [],
+      "claims": [
+        {
+          "id": "claim-unsupported",
+          "statement": "Access was observed without a source.",
+          "basis": "OBSERVED",
+          "confidence": "high",
+          "limitations": [],
+          "sources": []
+        }
+      ]
+    }
+  },
+  {
+    "id": "incomplete-review",
+    "provider": "OPENROUTER",
+    "model": "nvidia/nemotron-3.5-super-vl",
+    "taskType": "RESEARCH_CONCLUSION_REVIEW",
+    "stage": "REVIEW",
+    "expectedValid": false,
+    "sources": {},
+    "reviewClaims": { "00000000-0000-4000-8000-000000000002": ["claim-access"] },
+    "output": { "reviews": [], "conclusions": [], "missingInformation": [] }
+  }
+]

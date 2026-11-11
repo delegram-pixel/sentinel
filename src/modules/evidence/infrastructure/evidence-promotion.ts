@@ -45,17 +45,16 @@ export async function promoteReviewedEvidence(
     !row.uploadValidatedAt
   )
     throw new ResearchOperationError("CONFLICT", "The reviewed upload is unavailable or changed.");
-  if (
-    input.destinationKey !==
-    activeStorageKey(job.workspaceId, row.investigationId, row.id, row.version)
-  )
-    throw new ResearchOperationError(
-      "INVALID_SOURCE",
-      "The promotion destination does not match the evidence identity.",
-    );
+  const inPlace = storage.promotionMode === "IN_PLACE";
+
   if (row.storageKey) {
+    const expected = inPlace
+      ? row.storageKey
+      : activeStorageKey(job.workspaceId, row.investigationId, row.id, row.version);
+
     if (
       row.storageKey !== input.destinationKey ||
+      row.storageKey !== expected ||
       row.redactionStatus !== input.decision ||
       row.redactionReviewedBy !== job.requestedBy
     )
@@ -64,6 +63,15 @@ export async function promoteReviewedEvidence(
         "A different evidence promotion is already active.",
       );
   } else {
+    const expectedDestination = inPlace
+      ? row.quarantineKey
+      : activeStorageKey(job.workspaceId, row.investigationId, row.id, row.version);
+
+    if (!expectedDestination || input.destinationKey !== expectedDestination)
+      throw new ResearchOperationError(
+        "INVALID_SOURCE",
+        "The promotion destination does not match the evidence identity.",
+      );
     if (row.quarantineKey !== input.sourceKey)
       throw new ResearchOperationError(
         "INVALID_SOURCE",
@@ -81,7 +89,11 @@ export async function promoteReviewedEvidence(
       }))
     )
       throw new ResearchOperationError("JOB_CANCELLED", "Evidence promotion lost its lease.");
-    await storage.copyObject(input.sourceKey, input.destinationKey);
+
+    if (!inPlace) {
+      await storage.copyObject(input.sourceKey, input.destinationKey);
+    }
+
     const object = await storage.getObject(input.destinationKey);
     if (
       !object ||
@@ -90,7 +102,9 @@ export async function promoteReviewedEvidence(
     )
       throw new ResearchOperationError(
         "EVIDENCE_ACTIVATION_FAILED",
-        "The copied evidence did not pass checksum and size verification. Its original is retained.",
+        inPlace
+          ? "The uploaded evidence did not pass checksum and size verification."
+          : "The copied evidence did not pass checksum and size verification. Its original is retained.",
       );
     const store = new PrismaEvidenceStore(db);
     const activated = await store.activateEvidence(
@@ -121,7 +135,9 @@ export async function promoteReviewedEvidence(
         "Evidence or promotion state changed before activation.",
       );
   }
-  // The original remains until the verified active copy and its metadata exist.
-  await storage.deleteObject(input.sourceKey);
+  if (!inPlace) {
+    // The original remains until the verified active copy and its metadata exist.
+    await storage.deleteObject(input.sourceKey);
+  }
   return { evidenceId: row.id, promoted: true };
 }

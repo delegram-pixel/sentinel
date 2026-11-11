@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 type StreamEvent =
   | { type: "start"; conversationId: string }
+  | { type: "queued"; conversationId: string; jobId: string }
   | { type: "complete"; conversationId: string; taskId: string; messageId: string }
   | { type: "error"; code: string; message: string };
 
@@ -42,6 +43,7 @@ export function ChatForm({
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [queued, setQueued] = useState(false);
   const operation = useRef<{ message: string; key: string; conversationId: string } | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -53,6 +55,7 @@ export function ChatForm({
 
     setPending(true);
     setError(null);
+    setQueued(false);
     if (
       operation.current?.message !== message ||
       operation.current.conversationId !== conversationId
@@ -111,6 +114,10 @@ export function ChatForm({
             failed = true;
           }
           if (event.type === "complete") completed = true;
+          if (event.type === "queued") {
+            completed = true;
+            setQueued(true);
+          }
         }
       }
 
@@ -168,7 +175,9 @@ export function ChatForm({
           <span role="status" className="text-xs text-text-secondary">
             {pending
               ? "Your question is sent. The assistant is working through the saved context."
-              : ""}
+              : queued
+                ? "Your question is queued. Its reply will appear when processing finishes."
+                : ""}
           </span>
         </div>
       </FieldGroup>

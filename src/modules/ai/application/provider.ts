@@ -1,4 +1,5 @@
 import type { AiTaskType } from "../domain/ai-config";
+import type { AiProviderName } from "../domain/ai-config";
 
 export type AiProviderMessage = {
   role: "user" | "assistant";
@@ -12,6 +13,13 @@ export type AiStructuredOutputRequest = {
 };
 
 export type AiProviderRequest = {
+  provider?: AiProviderName;
+  inputTokenEstimate?: number;
+  costEstimateUsd?: number | null;
+  retryCount?: number;
+  fallbackFrom?: string;
+  pricing?: { input: number; output: number };
+  purpose?: "BATCH_REVIEW" | "BATCH_MERGE" | "FINAL" | "SOURCE_CHECK";
   taskType: AiTaskType;
   model: string;
   system: string;
@@ -25,9 +33,14 @@ export type AiProviderRequest = {
 export type AiTokenUsage = {
   inputTokens: number;
   outputTokens: number;
+  reasoningTokens?: number;
+  cachedInputTokens?: number;
 };
 
 export type AiProviderResponse = {
+  model?: string;
+  host?: string;
+  costUsd?: number;
   providerRequestId?: string;
   text: string;
   structured: unknown | null;
@@ -41,6 +54,12 @@ export type AiProviderResponse = {
  */
 export interface AIProvider {
   readonly name: string;
+  countInputTokens?(request: AiProviderRequest): number;
+  readonly executionPolicy?: {
+    maxRequestTokens: number;
+    intermediateMaxTokens: number;
+    countInputTokens(request: AiProviderRequest): number;
+  };
   generate(request: AiProviderRequest): Promise<AiProviderResponse>;
 }
 

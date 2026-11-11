@@ -50,6 +50,7 @@ it("retries promotion from a retained original and preserves reviewed version re
     let copyCount = 0;
     const storage: EvidenceStorage = {
       kind: "MEMORY",
+      promotionMode: "COPY",
       async createUploadTarget() {
         throw new Error("Unused");
       },

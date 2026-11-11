@@ -81,6 +81,34 @@ describe("target service", () => {
     expect(result.second).toMatchObject({ ok: false, code: "TARGET_DUPLICATE" });
   });
 
+  it("treats asset identifiers as case-insensitive within a project", async () => {
+    const result = await withRollback(client, async (tx) => {
+      const tenancy = await createTenancy(tx);
+      const store = new PrismaResearchStore(tx);
+      const actor = { userId: tenancy.user.id, workspaceId: tenancy.workspace.id };
+
+      const first = await createTarget(
+        store,
+        store,
+        actor,
+        tenancy.project.id,
+        targetInput({ assetIdentifier: "Staging.Example.Test" }),
+      );
+      const second = await createTarget(
+        store,
+        store,
+        actor,
+        tenancy.project.id,
+        targetInput({ assetIdentifier: "staging.example.test" }),
+      );
+
+      return { first, second };
+    });
+
+    expect(result.first.ok).toBe(true);
+    expect(result.second).toMatchObject({ ok: false, code: "TARGET_DUPLICATE" });
+  });
+
   it("does not add targets to an archived project", async () => {
     const result = await withRollback(client, async (tx) => {
       const tenancy = await createTenancy(tx);

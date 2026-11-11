@@ -6,6 +6,8 @@ import { executeAiJob } from "@/modules/ai/infrastructure/ai-job-executor";
 import { processKnowledgeDocument } from "@/modules/knowledge/infrastructure/prisma-knowledge-retrieval";
 import { ResearchOperationError } from "@/modules/shared/domain/result";
 import { PrismaJobStore } from "./prisma-job-store";
+import { JobContinuation } from "../domain/job";
+import { AiError } from "@/modules/ai/domain/ai-errors";
 import { cleanupDeletedEvidence } from "@/modules/evidence/infrastructure/evidence-cleanup";
 import { createEvidenceStorage } from "@/modules/evidence/infrastructure/storage-factory";
 import { processToolImport } from "@/modules/imports/infrastructure/prisma-import-store";
@@ -72,11 +74,20 @@ export async function processNextResearchJob(
         "The worker lost its lease before completion.",
       );
   } catch (error) {
-    const code = error instanceof ResearchOperationError ? error.code : "JOB_PROCESSING_FAILED";
+    if (error instanceof JobContinuation) {
+      await heartbeatWork;
+      if (leaseHealthy) await store.defer(job, error.availableAt, error.progress);
+      return true;
+    }
+    const code =
+      error instanceof ResearchOperationError || error instanceof AiError
+        ? error.code
+        : "JOB_PROCESSING_FAILED";
     await store.fail(
       job,
       code,
-      !(error instanceof ResearchOperationError) || code === "AI_RATE_LIMITED",
+      !(error instanceof ResearchOperationError || error instanceof AiError) ||
+        code === "AI_RATE_LIMITED",
     );
   } finally {
     clearInterval(heartbeat);

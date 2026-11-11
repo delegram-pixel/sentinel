@@ -3,6 +3,9 @@ import { persistAgentAssessments } from "./agent-result-store";
 import { createHash } from "node:crypto";
 import { AiError } from "../domain/ai-errors";
 import { AI_DAILY_USER_TOKEN_CAP } from "../domain/ai-budgets";
+import { estimateTokens, estimateCostUsd } from "../domain/ai-budgets";
+import { AI_TASK_PROFILES } from "../domain/ai-config";
+import { getServerEnv } from "@/config/env.server";
 import type { AiProviderRequest, AiProviderResponse } from "../application/provider";
 import { PrismaKnowledgeRetrievalStore } from "@/modules/knowledge/infrastructure/prisma-knowledge-retrieval";
 
@@ -80,6 +83,9 @@ const messageSelect = {
 type MessageRecord = Prisma.AIMessageGetPayload<{ select: typeof messageSelect }>;
 
 const taskSelect = {
+  collaborationId: true,
+  collaborationStage: true,
+  evaluation: true,
   id: true,
   workspaceId: true,
   investigationId: true,
@@ -88,6 +94,7 @@ const taskSelect = {
   status: true,
   assignedRole: true,
   inputContext: true,
+  executionState: true,
   output: true,
   errorMessage: true,
   failureCode: true,
@@ -154,6 +161,63 @@ function jsonInput(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNu
 
 export class PrismaAIStore implements AiStore {
   constructor(private readonly db: Db) {}
+  private responseCost(request: Prisma.JsonValue, response: AiProviderResponse): number | null {
+    const r = request as {
+      costEstimateUsd?: number | null;
+      pricing?: { input: number; output: number };
+    };
+    return r.pricing
+      ? (response.usage.inputTokens * r.pricing.input +
+          response.usage.outputTokens * r.pricing.output) /
+          1000000
+      : r.costEstimateUsd === 0
+        ? 0
+        : null;
+  }
+  private async reserveCost(tx: Db, taskId: string, request: AiProviderRequest): Promise<number> {
+    const cost = request.costEstimateUsd;
+    if (cost === undefined || cost === 0) return 0;
+    const env = getServerEnv();
+    if (cost === null || !env.AI_ALLOW_PAID_MODELS || env.AI_MAX_DAILY_COST_USD <= 0)
+      throw new AiError("AI_COST_LIMIT");
+    await tx.$executeRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(hashtext('sentinel-ai-spending'))`,
+    );
+    const task = await tx.aITask.findUniqueOrThrow({
+      where: { id: taskId },
+      select: { executionJobId: true },
+    });
+    const group = task.executionJobId
+      ? await tx.aITask.findMany({
+          where: { executionJobId: task.executionJobId },
+          select: { id: true },
+        })
+      : [{ id: taskId }];
+    const taskIds = group.map((t) => t.id);
+    const since = new Date(Date.now() - 86400000);
+    const rows = await tx.aIExecutionAttempt.findMany({
+      where: {
+        OR: [
+          { startedAt: { gte: since } },
+          { reservedCostUsd: { gt: 0 } },
+          { taskId: { in: taskIds } },
+        ],
+      },
+      select: { taskId: true, startedAt: true, estimatedCostUsd: true, reservedCostUsd: true },
+    });
+    const sum = (values: typeof rows) =>
+      values.reduce(
+        (n, row) => n + Number(row.estimatedCostUsd ?? 0) + Number(row.reservedCostUsd),
+        0,
+      );
+    if (
+      sum(rows.filter((row) => row.startedAt >= since || Number(row.reservedCostUsd) > 0)) + cost >
+        env.AI_MAX_DAILY_COST_USD ||
+      sum(rows.filter((row) => taskIds.includes(row.taskId))) + cost > env.AI_MAX_TASK_COST_USD
+    )
+      throw new AiError("AI_COST_LIMIT");
+    return cost;
+  }
   listUncertainUsage(workspaceId: string) {
     return this.db.aITask.findMany({
       where: { workspaceId, usageUncertain: true },
@@ -209,6 +273,9 @@ export class PrismaAIStore implements AiStore {
         select: {
           id: true,
           requestedBy: true,
+          provider: true,
+          reservedTokens: true,
+          inputContext: true,
           investigation: { select: { status: true, project: { select: { status: true } } } },
         },
       });
@@ -222,11 +289,112 @@ export class PrismaAIStore implements AiStore {
         }))
       )
         throw new AiError("AI_PERMISSION_DENIED");
+      {
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "User" WHERE id = ${task.requestedBy}::uuid FOR UPDATE`,
+        );
+        const captured = await tx.aIExecutionAttempt.aggregate({
+          where: { taskId },
+          _sum: { inputTokens: true, outputTokens: true },
+        });
+        const needed =
+          (captured._sum.inputTokens ?? 0) +
+          (captured._sum.outputTokens ?? 0) +
+          (request.inputTokenEstimate ??
+            estimateTokens(
+              request.system +
+                JSON.stringify(request.messages) +
+                JSON.stringify(request.structuredOutput),
+            )) +
+          request.maxTokens;
+        if (needed > task.reservedTokens) {
+          const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const ledger = await tx.aITask.findMany({
+            where: {
+              requestedBy: task.requestedBy,
+              OR: [
+                { createdAt: { gte: since } },
+                { completedAt: { gte: since } },
+                { usageReconciledAt: { gte: since } },
+                { reservedTokens: { gt: 0 } },
+              ],
+            },
+            select: { reservedTokens: true, inputTokens: true, outputTokens: true },
+          });
+          const used = ledger.reduce(
+            (total, row) => total + row.reservedTokens + row.inputTokens + row.outputTokens,
+            0,
+          );
+          if (used + needed - task.reservedTokens > AI_DAILY_USER_TOKEN_CAP)
+            throw new AiError("AI_BUDGET_EXCEEDED");
+          await tx.aITask.update({ where: { id: taskId }, data: { reservedTokens: needed } });
+        }
+        const manifest = (
+          task.inputContext as {
+            sourceManifest?: { evidenceIds?: string[]; knowledgeIds?: string[] };
+          } | null
+        )?.sourceManifest;
+        const evidenceIds = manifest?.evidenceIds ?? [];
+        const evidenceVersions =
+          (
+            task.inputContext as {
+              evidence?: Array<{ id: string; version: number; checksum?: string }>;
+            } | null
+          )?.evidence ?? [];
+        for (const evidence of evidenceVersions)
+          if (
+            !(await tx.evidence.findFirst({
+              where: {
+                id: evidence.id,
+                workspaceId,
+                version: evidence.version,
+                ...(evidence.checksum ? { checksum: evidence.checksum } : {}),
+                deletedAt: null,
+                redactionStatus: { in: ["REDACTED", "VERIFIED_SAFE"] },
+              },
+              select: { id: true },
+            }))
+          )
+            throw new AiError("AI_PERMISSION_DENIED", "Evidence changed after context capture.");
+        if (
+          evidenceIds.length &&
+          (await tx.evidence.count({
+            where: {
+              id: { in: evidenceIds },
+              workspaceId,
+              deletedAt: null,
+              storageKey: { not: null },
+              redactionStatus: { in: ["REDACTED", "VERIFIED_SAFE"] },
+            },
+          })) !== new Set(evidenceIds).size
+        )
+          throw new AiError("AI_PERMISSION_DENIED", "A source was withdrawn before this batch.");
+        const knowledgeIds = manifest?.knowledgeIds ?? [];
+        if (
+          knowledgeIds.length &&
+          (await tx.knowledgeChunk.count({
+            where: {
+              id: { in: knowledgeIds },
+              workspaceId,
+              document: { reviewStatus: "REVIEWED" },
+            },
+          })) !== new Set(knowledgeIds).size
+        )
+          throw new AiError(
+            "AI_PERMISSION_DENIED",
+            "A knowledge source was withdrawn before this batch.",
+          );
+      }
       return tx.aIExecutionAttempt.create({
         data: {
           workspaceId,
           taskId,
           sequence,
+          provider: request.provider ?? task.provider,
+          model: request.model,
+          retryCount: request.retryCount ?? 0,
+          fallbackFrom: request.fallbackFrom,
+          reservedCostUsd: await this.reserveCost(tx, taskId, request),
           requestHash: createHash("sha256").update(JSON.stringify(request)).digest("hex"),
           request: jsonInput(request),
         },
@@ -239,7 +407,11 @@ export class PrismaAIStore implements AiStore {
     attemptId: string,
     response: AiProviderResponse | null,
     failureCode?: string,
+    delivery?: "REJECTED" | "UNCERTAIN",
   ) {
+    const old = await this.db.aIExecutionAttempt.findFirst({
+      where: { id: attemptId, workspaceId, status: "STARTED" },
+    });
     await this.db.aIExecutionAttempt.updateMany({
       where: { id: attemptId, workspaceId, status: "STARTED" },
       data: {
@@ -250,6 +422,14 @@ export class PrismaAIStore implements AiStore {
         response: response ? jsonInput(response) : Prisma.DbNull,
         failureCode,
         completedAt: new Date(),
+        returnedModel: response?.model,
+        host: response?.host,
+        latencyMs: old ? Math.max(0, Date.now() - old.startedAt.getTime()) : undefined,
+        estimatedCostUsd:
+          response?.costUsd ??
+          (response && old ? this.responseCost(old.request, response) : undefined),
+        reservedCostUsd: response || delivery === "REJECTED" ? 0 : undefined,
+        delivery: response ? "RECEIVED" : (delivery ?? "UNCERTAIN"),
       },
     });
   }
@@ -320,6 +500,60 @@ export class PrismaAIStore implements AiStore {
       )
         return null;
       let message: AiMessageRow | null = null;
+      const versions =
+        (
+          task.inputContext as {
+            evidence?: Array<{ id: string; version: number; checksum?: string }>;
+          } | null
+        )?.evidence ?? [];
+      for (const evidence of versions)
+        if (
+          !(await tx.evidence.findFirst({
+            where: {
+              id: evidence.id,
+              workspaceId,
+              version: evidence.version,
+              ...(evidence.checksum ? { checksum: evidence.checksum } : {}),
+              deletedAt: null,
+              redactionStatus: { in: ["REDACTED", "VERIFIED_SAFE"] },
+            },
+            select: { id: true },
+          }))
+        )
+          throw new AiError("AI_PERMISSION_DENIED", "Evidence changed before result completion.");
+      const manifest = (
+        task.inputContext as {
+          sourceManifest?: { knowledgeIds?: string[]; evidenceIds?: string[] };
+        } | null
+      )?.sourceManifest;
+      const knowledgeIds = manifest?.knowledgeIds ?? [];
+      if (
+        knowledgeIds.length &&
+        (await tx.knowledgeChunk.count({
+          where: { id: { in: knowledgeIds }, workspaceId, document: { reviewStatus: "REVIEWED" } },
+        })) !== new Set(knowledgeIds).size
+      )
+        throw new AiError(
+          "AI_PERMISSION_DENIED",
+          "A knowledge source was withdrawn before result completion.",
+        );
+      const evidenceIds = manifest?.evidenceIds ?? [];
+      if (
+        evidenceIds.length &&
+        (await tx.evidence.count({
+          where: {
+            id: { in: evidenceIds },
+            workspaceId,
+            deletedAt: null,
+            storageKey: { not: null },
+            redactionStatus: { in: ["REDACTED", "VERIFIED_SAFE"] },
+          },
+        })) !== new Set(evidenceIds).size
+      )
+        throw new AiError(
+          "AI_PERMISSION_DENIED",
+          "An evidence source was withdrawn before result completion.",
+        );
       if (result.message) {
         if (result.message.conversationId !== task.conversationId)
           throw new AiError("AI_PERMISSION_DENIED");
@@ -358,7 +592,10 @@ export class PrismaAIStore implements AiStore {
         where: { id: taskId },
         data: {
           status: "COMPLETED",
+          model: data.model,
+          provider: data.provider,
           output: jsonInput(data.output),
+          ...(data.evaluation !== undefined ? { evaluation: jsonInput(data.evaluation) } : {}),
           inputTokens: data.inputTokens ?? 0,
           outputTokens: data.outputTokens ?? 0,
           estimatedCostUsd: data.estimatedCostUsd ?? 0,
@@ -384,6 +621,7 @@ export class PrismaAIStore implements AiStore {
     investigationId: string,
     conversationId?: string,
     requestedBy?: string,
+    preserveAll = false,
   ): Promise<AiContextRecord | null> {
     const investigation = await this.db.investigation.findFirst({
       where: { id: investigationId, workspaceId },
@@ -400,7 +638,7 @@ export class PrismaAIStore implements AiStore {
         engagement: { select: { id: true, name: true, objective: true, status: true } },
         findings: {
           orderBy: { updatedAt: "desc" },
-          take: 20,
+          take: preserveAll ? undefined : 20,
           select: {
             id: true,
             title: true,
@@ -420,7 +658,7 @@ export class PrismaAIStore implements AiStore {
         },
         decisions: {
           orderBy: { createdAt: "desc" },
-          take: 30,
+          take: preserveAll ? undefined : 30,
           select: { id: true, kind: true, rationale: true, sourceRefs: true, createdAt: true },
         },
         project: {
@@ -445,7 +683,7 @@ export class PrismaAIStore implements AiStore {
           },
         },
         observations: {
-          take: 100,
+          take: preserveAll ? undefined : 100,
           orderBy: { createdAt: "desc" },
           select: {
             id: true,
@@ -458,7 +696,7 @@ export class PrismaAIStore implements AiStore {
           },
         },
         hypotheses: {
-          take: 60,
+          take: preserveAll ? undefined : 60,
           orderBy: { updatedAt: "desc" },
           select: {
             id: true,
@@ -475,7 +713,7 @@ export class PrismaAIStore implements AiStore {
           },
         },
         sessionSummaries: {
-          take: 5,
+          take: preserveAll ? undefined : 5,
           orderBy: { createdAt: "desc" },
           select: {
             id: true,
@@ -498,7 +736,7 @@ export class PrismaAIStore implements AiStore {
             redactionStatus: { in: ["REDACTED", "VERIFIED_SAFE"] },
           },
           orderBy: { createdAt: "desc" },
-          take: 40,
+          take: preserveAll ? undefined : 40,
           select: {
             id: true,
             title: true,
@@ -858,7 +1096,8 @@ export class PrismaAIStore implements AiStore {
         (total, task) => total + task.inputTokens + task.outputTokens + task.reservedTokens,
         0,
       );
-      const reservation = 2 * (data.inputTokenBudget + data.outputTokenBudget);
+      const reservation =
+        data.reservationTokens ?? 2 * (data.inputTokenBudget + data.outputTokenBudget);
       const budgetExceeded = used + reservation > AI_DAILY_USER_TOKEN_CAP;
 
       const investigation = await tx.investigation.findFirst({
@@ -899,6 +1138,8 @@ export class PrismaAIStore implements AiStore {
           outputTokenBudget: data.outputTokenBudget,
           requestedBy: data.requestedBy,
           parentTaskId: data.parentTaskId,
+          collaborationId: data.collaborationId,
+          collaborationStage: data.collaborationStage,
           correlationId: data.correlationId,
           ...(data.inputContext !== undefined
             ? { inputContext: jsonInput(data.inputContext) }
@@ -938,6 +1179,24 @@ export class PrismaAIStore implements AiStore {
     data: AiTaskUpdateData,
   ): Promise<AiTaskRow | null> {
     return this.db.$transaction(async (tx) => {
+      if (data.executionJobId) {
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "BackgroundJob" WHERE id = ${data.executionJobId}::uuid FOR UPDATE`,
+        );
+        if (
+          !(await tx.backgroundJob.findFirst({
+            where: {
+              id: data.executionJobId,
+              workspaceId,
+              status: "RUNNING",
+              leaseToken: data.executorToken,
+              leaseUntil: { gt: new Date() },
+              cancelRequestedAt: null,
+            },
+          }))
+        )
+          return null;
+      }
       await tx.$queryRaw(
         Prisma.sql`SELECT id FROM "AITask" WHERE id = ${taskId}::uuid AND "workspaceId" = ${workspaceId}::uuid FOR UPDATE`,
       );
@@ -950,11 +1209,15 @@ export class PrismaAIStore implements AiStore {
           reservedTokens: true,
           usageUncertain: true,
           requestedBy: true,
+          executionJobId: true,
+          provider: true,
+          taskType: true,
         },
       });
 
       if (
         !existing ||
+        (data.executionJobId && existing.executionJobId !== data.executionJobId) ||
         ["COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"].includes(existing.status) ||
         (data.status === "RUNNING" && existing.status !== "PENDING")
       ) {
@@ -1030,7 +1293,13 @@ export class PrismaAIStore implements AiStore {
                 { status: "STARTED" },
                 {
                   status: "FAILED",
-                  failureCode: { in: ["AI_TIMEOUT", "AI_PROVIDER_ERROR", "AI_INVALID_OUTPUT"] },
+                  OR: [
+                    { delivery: "UNCERTAIN" },
+                    {
+                      delivery: null,
+                      failureCode: { in: ["AI_TIMEOUT", "AI_PROVIDER_ERROR", "AI_INVALID_OUTPUT"] },
+                    },
+                  ],
                 },
               ],
             },
@@ -1040,23 +1309,35 @@ export class PrismaAIStore implements AiStore {
       const captured = terminal
         ? await tx.aIExecutionAttempt.aggregate({
             where: { taskId },
-            _sum: { inputTokens: true, outputTokens: true },
+            _sum: { inputTokens: true, outputTokens: true, estimatedCostUsd: true },
           })
         : null;
       const update: Prisma.AITaskUncheckedUpdateInput = {
         ...(terminal
-          ? { reservedTokens: uncertain ? existing.reservedTokens : 0, usageUncertain: uncertain }
+          ? {
+              reservedTokens: uncertain
+                ? Math.max(
+                    0,
+                    existing.reservedTokens -
+                      (captured?._sum.inputTokens ?? 0) -
+                      (captured?._sum.outputTokens ?? 0),
+                  )
+                : 0,
+              usageUncertain: uncertain,
+            }
           : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.executionJobId
           ? { executionJobId: data.executionJobId, executorToken: data.executorToken }
           : {}),
         ...(data.model !== undefined ? { model: data.model } : {}),
+        ...(data.provider !== undefined ? { provider: data.provider } : {}),
         ...(data.promptTemplateId !== undefined ? { promptTemplateId: data.promptTemplateId } : {}),
         ...(data.promptVersion !== undefined ? { promptVersion: data.promptVersion } : {}),
         ...(data.contextVersion !== undefined ? { contextVersion: data.contextVersion } : {}),
         ...(data.inputContext !== undefined ? { inputContext: jsonInput(data.inputContext) } : {}),
         ...(data.output !== undefined ? { output: jsonInput(data.output) } : {}),
+        ...(data.evaluation !== undefined ? { evaluation: jsonInput(data.evaluation) } : {}),
         ...(data.errorMessage !== undefined ? { errorMessage: data.errorMessage } : {}),
         ...(data.failureCode !== undefined ? { failureCode: data.failureCode } : {}),
         ...(terminal
@@ -1068,7 +1349,20 @@ export class PrismaAIStore implements AiStore {
               ...(data.inputTokens !== undefined ? { inputTokens: data.inputTokens } : {}),
               ...(data.outputTokens !== undefined ? { outputTokens: data.outputTokens } : {}),
             }),
-        ...(data.estimatedCostUsd !== undefined ? { estimatedCostUsd: data.estimatedCostUsd } : {}),
+        ...(data.estimatedCostUsd !== undefined
+          ? { estimatedCostUsd: data.estimatedCostUsd }
+          : terminal
+            ? {
+                estimatedCostUsd:
+                  captured?._sum.estimatedCostUsd ??
+                  estimateCostUsd(
+                    AI_TASK_PROFILES[existing.taskType].tier,
+                    captured?._sum.inputTokens ?? 0,
+                    captured?._sum.outputTokens ?? 0,
+                    existing.provider,
+                  ),
+              }
+            : {}),
         ...(data.startedAt !== undefined ? { startedAt: data.startedAt } : {}),
         ...(data.completedAt !== undefined ? { completedAt: data.completedAt } : {}),
       };

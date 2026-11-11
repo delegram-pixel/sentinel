@@ -31,7 +31,7 @@
 | ADR-016 | Severity assessment and affected asset capture | Accepted | 2026-11-03 |
 | ADR-017 | Target and scope field completion; derived authorization | Accepted | 2026-11-03 |
 | ADR-018 | Vercel, Neon, and pooled Prisma connections | Accepted | 2026-11-03 |
-| ADR-019 | Cloudflare R2 private object storage and upload constraints | Accepted | 2026-11-03 |
+| ADR-019 | Private evidence storage and upload constraints (amended: UploadThing) | Accepted | 2026-11-03 |
 | ADR-020 | Upstash Redis for rate limiting | Accepted | 2026-11-03 |
 | ADR-021 | CI, test database, and deterministic AI mock | Accepted | 2026-11-03 |
 | ADR-022 | Secrets management and deferred BYOK encryption | Accepted | 2026-11-03 |
@@ -42,6 +42,8 @@
 | ADR-027 | Report PDF export and template management | Accepted | 2026-11-06 |
 | ADR-031 | Skippable first-use workspace tour | Accepted | 2026-11-07 |
 | ADR-032 | Vercel production deployment through GitHub Actions | Accepted | 2026-11-07 |
+| ADR-033 | Groq free inference with durable full-context batch review | Accepted | 2026-11-10 |
+| ADR-034 | Controlled multi-model intelligence | Accepted | 2026-11-11 |
 
 ---
 
@@ -196,10 +198,11 @@ DB models evidence as investigation-owned with `EvidenceLink`; TA adds `workspac
 2. `workspaceId` is denormalized onto the evidence record for query isolation and is maintained by the service layer. `projectId` is derived through the investigation.
 3. Findings are linked only through `EvidenceLink` with relationship types `SUPPORTS`, `CONTRADICTS`, `CONTEXT`, and `REPRODUCTION`. There is no direct `findingId` on evidence.
 4. Evidence types are: `SCREENSHOT`, `HTTP_REQUEST`, `HTTP_RESPONSE`, `TEXT_OBSERVATION`, `DOCUMENT`, `LOG`, `EXTERNAL_REFERENCE`, `REPRODUCTION_NOTE`, `OTHER`.
-5. Upload uses a two-step presigned flow:
+5. Upload uses a two-step flow:
    - the client requests an upload intent;
    - the server validates authentication, workspace access, scope, MIME type, and size;
-   - the server returns a short-lived presigned PUT URL and an evidence ID;
+   - the server returns an upload intent and an evidence ID (the transport is defined by ADR-019:
+     UploadThing FileRouter uploads in production, a presigned PUT URL in local development);
    - the client uploads directly to private storage;
    - the client calls finalize; the server verifies object metadata and checksum before marking the evidence active.
 6. Evidence content is immutable after finalization. Corrections create a new record with `version` and `supersedesId`.
@@ -210,7 +213,7 @@ DB models evidence as investigation-owned with `EvidenceLink`; TA adds `workspac
 
 ### Consequences
 
-- Storage requires an S3-compatible private bucket and a presigned URL implementation.
+- Storage requires a private provider and a direct-upload implementation (ADR-019).
 - The upload intent and finalize endpoints are part of the API surface.
 - Evidence queries can be workspace-scoped without joining every parent table.
 - Immutability means the editing UI must be "supersede", not "edit".
@@ -1066,7 +1069,7 @@ The intent of items 3–4 is unchanged; only the configuration surface differs.
 
 ---
 
-## ADR-019 — Cloudflare R2 private object storage and upload constraints
+## ADR-019 — Private evidence storage and upload constraints
 
 **Status:** Accepted
 **Date:** 2026-11-03
@@ -1114,12 +1117,70 @@ Evidence and authorization artifacts require private object storage with presign
 - The MVP accepts a documented malware risk in exchange for faster delivery.
 - Image and PDF handling must be treated as untrusted at every layer.
 
+### Amendment — 2026-11-10: UploadThing replaces Cloudflare R2
+
+UploadThing replaces the R2/S3-compatible bucket for **evidence files**. Tool-import originals remain
+in PostgreSQL; only evidence storage changes.
+
+1. Evidence objects live in an UploadThing app configured with the **private** ACL and signed-URL
+   expiry overrides enabled. There is no public object access and no public object URL.
+2. The browser uploads directly to UploadThing through the authenticated `evidenceUploader`
+   FileRouter route. Files never pass through a Next.js route handler or Server Action.
+3. The production credential is `UPLOADTHING_TOKEN`. `STORAGE_ENDPOINT`, `STORAGE_REGION`,
+   `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, and `STORAGE_SECRET_ACCESS_KEY` are retired. A
+   deployment without `UPLOADTHING_TOKEN` fails fast; development and tests fall back to the local
+   filesystem (`EVIDENCE_LOCAL_DIR`, default `.data/evidence`).
+4. The FileRouter enforces authentication, evidence ownership, the MIME allowlist, the 25 MB limit,
+   and a single-file count before accepting bytes. The UploadThing `maxFileSize` is 32 MB so the
+   application limit remains the tighter control.
+5. Upload intent returns `{ kind: "UPLOADTHING" }`; the local fallback still returns a short-lived
+   presigned PUT URL. `finalize` downloads the UploadThing object server-side and re-verifies its
+   size, SHA-256 checksum, and magic bytes before the record can be reviewed.
+6. **Promotion is in place.** Quarantine is a database state (private object keyed by
+   `quarantineKey` plus `redactionStatus`), not a second physical copy. On approval the record's
+   `storageKey` is set to the uploaded object and `quarantineKey` is cleared; there is no copy,
+   rename, or second upload. Rejection deletes the private object and the cleanup job retries
+   failures.
+7. Active evidence is immutable in the application: it is never overwritten, and corrections create
+   a new version under ADR-004 and ADR-013. UploadThing file keys replace the custom quarantine and
+   active key prefixes; the database state distinguishes the two phases.
+8. Downloads use short-lived signed URLs (five minutes) after the same server-side authorization
+   check. UploadThing controls the response headers, so the app cannot force
+   `Content-Disposition: attachment` on the signed URL; inline rendering for PDFs is a follow-up
+   item, not an enforced control in this provider.
+9. The MIME allowlist, magic-byte validation, SHA-256 verification, size limit, and quarantine
+   review from the original decision are unchanged.
+10. The storage adapter remains an interface (`EvidenceStorage`) with `LOCAL`, `MEMORY`, and
+    `UPLOADTHING` implementations. The AWS SDK and S3-specific code are removed.
+
+### Consequences of the amendment
+
+- UploadThing replaces bucket lifecycle rules with application-driven cleanup; rejection and
+  replacement deletes are retried by the `EVIDENCE_CLEANUP` job.
+- The application no longer depends on the S3 API or ships the AWS SDK.
+- UploadThing's private ACL, signed URLs, and availability become part of the security and
+  operational boundary.
+- The MVP malware risk and image/PDF untrusted-input posture are unchanged.
+
 ### Required document amendments (applied 2026-11-06)
 
 - `TECHNICAL-REQUIREMENTS.md` file storage section: record R2, limits, allowlist, and sniffing. **Applied.**
 - `TECHNICAL-ARCHITECTURE.md` §10 and §15: add the key scheme and storage variables. **Applied.**
 - `DATABASE-SCHEMA.md` §3.11: reference the quarantine and active key split. **Applied.**
 - `APP-FLOW.md` §11: add the size, type, and rejection behaviour. **Applied.**
+
+### UploadThing amendment follow-ups (2026-11-10)
+
+- `TECHNICAL-REQUIREMENTS.md`: replaced R2 with UploadThing, the FileRouter flow, and `UPLOADTHING_TOKEN`.
+  **Applied.**
+- `TECHNICAL-ARCHITECTURE.md` §10: replaced the R2 bucket and key scheme with UploadThing private
+  storage and in-place promotion. **Applied.**
+- `APP-FLOW.md` §11: replaced presigned quarantine uploads with the FileRouter flow and in-place
+  approval. **Applied.**
+- `DATABASE-SCHEMA.md` §3.11: the quarantine/active column split remains; the key source changed, so
+  no schema migration is required. **Applied.**
+- Decide whether to proxy non-image downloads to enforce `Content-Disposition: attachment`, or accept
+  UploadThing's provider-controlled headers.
 
 ### Follow-ups
 
@@ -1597,3 +1658,42 @@ otherwise deploy `main` immediately, before CI completes and before migrations r
 - Configure the Vercel project, production environment, preview Neon branch, and GitHub secrets.
 - Decide whether preview Neon branches are created automatically per pull request.
 - Add deployment alerting and a rollback rehearsal.
+
+---
+
+## ADR-033 — Groq free inference with durable full-context batch review
+
+**Status:** Accepted
+**Date:** 2026-11-10
+**Authority:** User instruction to set up Groq after choosing staged processing instead of reducing the investigation's evidence coverage.
+**Amends:** ADR-006's Anthropic-only credential, ADR-025's provider surface and compression policy for Groq, and ADR-029's execution scheduling.
+
+The deployment defaults to Groq's free GPT-OSS 120B for research and GPT-OSS 20B for summaries. The platform key remains server-only. Operators enable Zero Data Retention in Groq Data Controls and explicitly record that confirmation in server configuration before live processing. Anthropic remains an explicit legacy selection; there is no automatic paid fallback or provider switching during a run.
+
+Keep the existing 30k/40k/60k input allowances and final output limits. Groq context assembly preserves the complete selected source text instead of dropping records or truncating text to its per-minute quota. Context exceeding the task allowance fails explicitly. Binary, unavailable or oversized text evidence is identified as unavailable material, never represented as reviewed text.
+
+All live Groq analyses, including chat and summaries, use the existing durable worker. Review token-bounded source batches, merge intermediate notes when required, generate a draft, and recheck cited source passages before publishing the validated result. Every external call has a persisted request, response, usage and lease. A quota wait releases the worker lease and schedules continuation without consuming a failure retry. Received results resume without another call; uncertain interrupted calls fail for review rather than repeating automatically. Final results retain source coverage and limitations; batching is not equivalent to simultaneous full-context reasoning.
+
+PostgreSQL serializes provider-wide limits across all workspaces and workers. The initial free configuration permits at most 8k tokens per minute, 200k tokens per rolling day and 1,000 requests per rolling day for each model, with conservative request spacing and headroom. Account-specific lower limits can be configured. Intermediate outputs, repeated prompts, source checks and corrections count toward the existing atomic 250k rolling user budget. Free inference records zero estimated vendor cost; historical Anthropic usage retains its own accounting.
+
+Groq uses native strict JSON Schema responses, followed by the same Zod, source-reference and human-authority checks. Tests inject deterministic providers and clocks; CI makes no live AI calls. Native schema constraints are adapted at the provider boundary without weakening application validation.
+
+Required amendments: `.env.example`, `README.md` and `docs/v2/V2_OPERATIONS.md` document the configuration and worker; the model evaluation links this implemented decision. Older Anthropic-only architecture prose remains historical and is superseded by this ADR.
+
+
+## ADR-034 — Controlled multi-model intelligence
+
+**Status:** Accepted
+**Date:** 2026-11-11
+**Authority:** Approved multi-model implementation plan and explicit instruction to implement it.
+**Amends:** ADR-025's provider-specific routing, ADR-029's attempt limits, and ADR-033's prohibition of provider switching.
+
+Retain one central orchestrator, the modular monolith, shared investigation context, existing task schemas and authoritative human review. Extend the existing provider interface with Gemini and OpenRouter adapters alongside Groq and legacy Anthropic. A dated model registry owns capabilities, assignments, context/output limits, availability, timeouts and pricing. Unknown model overrides remain unverified until official metadata is supplied. No model-controlled browser, terminal, exploitation or unrestricted tool capability is added.
+
+Defaults preserve Groq free inference and LEGACY routing. MULTI_MODEL enables capability/privacy/health/context/cost routing. Paid models require explicit opt-in and positive job/daily caps; no automatic paid fallback is permitted without that configuration. Confidential context requires provider approval. Gemini confidential processing additionally requires paid service and explicit acceptance of its documented 55-day abuse-monitoring retention. OpenRouter is restricted to approved contracted hosts with native schema support, no data collection and ZDR; free endpoints are not confidential defaults. Provider policies and account limits must be verified before rollout.
+
+Collaborative research is an explicit complex workflow. Primary and blind secondary stages share one captured source context; an independent reviewer receives original sources and both claim lists. Distinct model IDs prevent self-review. Deterministic consolidation preserves opposing conclusions, citations, reasoning and missing stages. Secondary/reviewer failure yields INCOMPLETE retained results; primary failure yields FAILED. Ordinary tasks execute one model. No AI output confirms a vulnerability or overrides a human decision.
+
+Keep immutable input snapshots and store mutable execution progress separately. Every external call has a persisted attempt with model/provider/host identity, usage, latency, retries, fallback provenance and costs. PostgreSQL serializes account quotas and spending reservations across workers/workspaces, with the job cap covering every stage and batch. Known rejections can retry twice then select a compatible recorded fallback. Uncertain delivery cannot replay automatically and holds tokens/costs for reviewed reconciliation. Captured responses recover without another inference call. Recheck evidence versions/checksums and withdrawn knowledge before calls and final storage.
+
+Tests mock all provider traffic, exercise legacy Groq, collaboration blindness/conflicts, failures, rate limits, recovery, schema/source validation and concurrent spending. The offline evaluation harness reports deterministic checks and recorded metrics; it establishes no live-model accuracy ranking. [AI-MULTI-MODEL.md](AI-MULTI-MODEL.md) supplies official verification sources, configuration, limitations and deployment operations. Schema additions preserve historical conversations, outputs and human findings.

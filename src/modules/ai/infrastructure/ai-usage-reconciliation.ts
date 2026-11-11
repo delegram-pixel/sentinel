@@ -3,6 +3,8 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { AI_TASK_PROFILES } from "../domain/ai-config";
 import { estimateCostUsd } from "../domain/ai-budgets";
+import type { AiProviderRequest } from "../application/provider";
+import { ProviderQuotaStore } from "./groq-quota-store";
 import {
   ResearchOperationError,
   researchOperation,
@@ -16,6 +18,10 @@ export const aiUsageReconciliationSchema = z.object({
   taskId: z.uuid(),
   inputTokens: z.coerce.number().int().min(0).max(10000000),
   outputTokens: z.coerce.number().int().min(0).max(10000000),
+  costUsd: z.preprocess(
+    (value) => (value === "" || value === null ? undefined : value),
+    z.coerce.number().nonnegative().optional(),
+  ),
   providerReference: z.string().trim().min(3).max(300),
   rationale: z.string().trim().min(10).max(8000),
 });
@@ -67,16 +73,86 @@ export function reconcileAiUsage(
           "INVALID_USAGE",
           "Reconciled usage cannot be lower than the captured provider usage.",
         );
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext('sentinel-ai-spending'))`,
+      );
+      const uncertain = attempts.filter(
+        (a) =>
+          a.status === "STARTED" ||
+          a.delivery === "UNCERTAIN" ||
+          (a.status === "FAILED" &&
+            a.delivery === null &&
+            ["AI_TIMEOUT", "AI_PROVIDER_ERROR", "AI_INVALID_OUTPUT"].includes(a.failureCode ?? "")),
+      );
+      if (uncertain.length > 1)
+        throw new ResearchOperationError(
+          "INVALID_USAGE",
+          "Reconcile multiple uncertain attempts individually with the provider ledger.",
+        );
+      const pending = uncertain[0];
+      const request = pending?.request as AiProviderRequest | undefined;
+      const extraInput = input.inputTokens - known.input;
+      const extraOutput = input.outputTokens - known.output;
+      const capturedCost = attempts.reduce(
+        (total, a) => total + Number(a.estimatedCostUsd ?? 0),
+        0,
+      );
+      const extraCost = request?.pricing
+        ? (extraInput * request.pricing.input + extraOutput * request.pricing.output) / 1000000
+        : (pending?.provider ?? task.provider) === "GROQ"
+          ? 0
+          : (pending?.provider ?? task.provider) === "ANTHROPIC"
+            ? estimateCostUsd(
+                AI_TASK_PROFILES[task.taskType].tier,
+                extraInput,
+                extraOutput,
+                "ANTHROPIC",
+              )
+            : null;
+      if (extraCost === null && input.costUsd === undefined)
+        throw new ResearchOperationError(
+          "INVALID_USAGE",
+          "Supply the provider's verified total cost for this unpriced model.",
+        );
+      const cost = input.costUsd ?? capturedCost + (extraCost ?? 0);
+      if (cost < capturedCost)
+        throw new ResearchOperationError(
+          "INVALID_USAGE",
+          "Reconciled cost cannot be lower than captured cost.",
+        );
+      if (pending) {
+        await tx.aIExecutionAttempt.update({
+          where: { id: pending.id },
+          data: {
+            status: "FAILED",
+            delivery: "RECONCILED",
+            completedAt: new Date(),
+            reservedCostUsd: 0,
+            inputTokens: pending.inputTokens + extraInput,
+            outputTokens: pending.outputTokens + extraOutput,
+            estimatedCostUsd: Number(pending.estimatedCostUsd ?? 0) + cost - capturedCost,
+          },
+        });
+        const state = task.executionState as {
+          pending?: { quota?: { bucket: string; tokens: number; windowStartedAt: string } };
+        } | null;
+        const quota = state?.pending?.quota;
+        if (quota && pending.provider)
+          await new ProviderQuotaStore(tx, undefined, undefined, pending.provider).settle(
+            actor.workspaceId,
+            pending.id,
+            quota.bucket,
+            quota.tokens,
+            extraInput + extraOutput,
+            new Date(quota.windowStartedAt),
+          );
+      }
       await tx.aITask.update({
         where: { id: task.id },
         data: {
           inputTokens: input.inputTokens,
           outputTokens: input.outputTokens,
-          estimatedCostUsd: estimateCostUsd(
-            AI_TASK_PROFILES[task.taskType].tier,
-            input.inputTokens,
-            input.outputTokens,
-          ),
+          estimatedCostUsd: cost,
           usageUncertain: false,
           usageReconciledAt: new Date(),
           reservedTokens: 0,
@@ -90,6 +166,7 @@ export function reconcileAiUsage(
         previousOutputTokens: task.outputTokens,
         inputTokens: input.inputTokens,
         outputTokens: input.outputTokens,
+        costUsd: cost,
       });
       return { id: task.id };
     }),
@@ -118,7 +195,11 @@ export async function settleInterruptedAiTasks(
       (a) =>
         a.status === "STARTED" ||
         (a.status === "FAILED" &&
-          ["AI_TIMEOUT", "AI_PROVIDER_ERROR", "AI_INVALID_OUTPUT"].includes(a.failureCode ?? "")),
+          (a.delivery === "UNCERTAIN" ||
+            (a.delivery === null &&
+              ["AI_TIMEOUT", "AI_PROVIDER_ERROR", "AI_INVALID_OUTPUT"].includes(
+                a.failureCode ?? "",
+              )))),
     );
     const usage = attempts.reduce(
       (v, a) => ({
@@ -134,13 +215,18 @@ export async function settleInterruptedAiTasks(
         failureCode,
         completedAt: new Date(),
         ...usage,
-        estimatedCostUsd: estimateCostUsd(
-          AI_TASK_PROFILES[task.taskType].tier,
-          usage.inputTokens,
-          usage.outputTokens,
-        ),
+        estimatedCostUsd: attempts.some((a) => a.estimatedCostUsd !== null)
+          ? attempts.reduce((sum, a) => sum + Number(a.estimatedCostUsd ?? 0), 0)
+          : estimateCostUsd(
+              AI_TASK_PROFILES[task.taskType].tier,
+              usage.inputTokens,
+              usage.outputTokens,
+              task.provider,
+            ),
         usageUncertain: unknown,
-        reservedTokens: unknown ? task.reservedTokens : 0,
+        reservedTokens: unknown
+          ? Math.max(0, task.reservedTokens - usage.inputTokens - usage.outputTokens)
+          : 0,
         executorToken: null,
       },
     });

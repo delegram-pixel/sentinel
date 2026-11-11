@@ -32,6 +32,7 @@ afterAll(async () => {
 
 class MemoryEvidenceStorage implements EvidenceStorage {
   readonly kind = "MEMORY" as const;
+  readonly promotionMode = "COPY" as const;
   readonly objects = new Map<string, { body: Buffer; mimeType: string }>();
   lastUploadKey: string | null = null;
 

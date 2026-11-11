@@ -250,7 +250,7 @@ export class PrismaEvidenceStore implements EvidenceStore {
           title: data.title,
           description: data.description,
           fileName: data.fileName,
-          quarantineKey: data.quarantineKey,
+          quarantineKey: data.quarantineKey ?? null,
           mimeType: data.mimeType,
           fileSize: data.fileSize,
           checksum: data.checksum,
@@ -263,6 +263,51 @@ export class PrismaEvidenceStore implements EvidenceStore {
       await tx.auditLog.create({ data: auditRow(audit, evidence.id) });
 
       return mapEvidence(evidence);
+    });
+  }
+
+  async recordUploadedObject(
+    workspaceId: string,
+    evidenceId: string,
+    key: string,
+    audit: EvidenceAuditDraft,
+  ): Promise<boolean> {
+    return this.db.$transaction(async (tx) => {
+      const existing = await tx.evidence.findFirst({
+        where: { id: evidenceId, workspaceId, deletedAt: null, storageKey: null },
+        select: { quarantineKey: true },
+      });
+
+      if (!existing) {
+        return false;
+      }
+
+      if (existing.quarantineKey === key) {
+        return true;
+      }
+
+      if (existing.quarantineKey !== null) {
+        return false;
+      }
+
+      const updated = await tx.evidence.updateMany({
+        where: {
+          id: evidenceId,
+          workspaceId,
+          deletedAt: null,
+          storageKey: null,
+          quarantineKey: null,
+        },
+        data: { quarantineKey: key },
+      });
+
+      if (updated.count === 0) {
+        return false;
+      }
+
+      await tx.auditLog.create({ data: auditRow(audit, evidenceId) });
+
+      return true;
     });
   }
 

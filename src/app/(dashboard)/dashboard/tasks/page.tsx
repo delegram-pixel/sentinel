@@ -77,6 +77,10 @@ async function Content() {
                 { value: "", label: "Single selected analysis" },
                 { value: "CONTEXT_HYPOTHESES", label: "Context → Patterns → Hypotheses" },
                 { value: "EVIDENCE_VERIFICATION", label: "Evidence → Independent verification" },
+                {
+                  value: "COLLABORATIVE_RESEARCH",
+                  label: "Analysis → Second opinion → Conclusion review",
+                },
               ],
             },
           ]}
@@ -134,6 +138,7 @@ async function Content() {
                   fields={[
                     { name: "inputTokens", label: "Total billed input tokens", required: true },
                     { name: "outputTokens", label: "Total billed output tokens", required: true },
+                    { name: "costUsd", label: "Verified total cost in USD (optional)" },
                     {
                       name: "providerReference",
                       label: "Provider ledger reference",

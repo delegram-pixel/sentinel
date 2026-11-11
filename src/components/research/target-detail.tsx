@@ -9,13 +9,21 @@ import { RecordListSkeleton } from "@/components/shared/record-list-skeleton";
 import { RecordTable } from "@/components/shared/record-table";
 import { ResearchSection } from "@/components/shared/research-section";
 import { ResearchTime } from "@/components/shared/research-time";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TargetDetail } from "@/modules/research/application/ports";
 import { ASSET_TYPE_LABELS, ENVIRONMENT_TYPE_LABELS } from "@/modules/research/domain/target";
 
-export function TargetDetailView({ target, canEdit }: { target: TargetDetail; canEdit: boolean }) {
+export function TargetDetailView({
+  target,
+  canEdit,
+  justRegistered = false,
+}: {
+  target: TargetDetail;
+  canEdit: boolean;
+  justRegistered?: boolean;
+}) {
   const base = "/dashboard/projects/" + target.project.id + "/targets/" + target.id;
   return (
     <div className="page-stack">
@@ -53,6 +61,33 @@ export function TargetDetailView({ target, canEdit }: { target: TargetDetail; ca
           ) : undefined
         }
       />
+      {justRegistered ? (
+        <Alert variant="success">
+          <AlertTitle>Target registered successfully</AlertTitle>
+          <AlertDescription>
+            <p>
+              Your asset has been added to this workspace. The next step is to define and approve
+              its research scope.
+            </p>
+            <p className="mt-2">
+              Registering this target did not activate a scope. The scope lifecycle stays separate:
+            </p>
+            <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5">
+              <li>Target registration records the asset and your authorization context.</li>
+              <li>Drafting a scope defines the permitted assets, activities and dates.</li>
+              <li>
+                Reviewing and activating a draft records your approval and makes those boundaries
+                active.
+              </li>
+            </ol>
+            <div className="mt-4">
+              <Button asChild size="sm">
+                <Link href={base + "/scopes/new"}>Create scope</Link>
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {!canEdit ? (
         <Alert role="note">
           <AlertDescription>
@@ -98,7 +133,7 @@ export function TargetDetailView({ target, canEdit }: { target: TargetDetail; ca
           className="sm:grid-cols-2"
           items={[
             {
-              label: "Program",
+              label: "Program or agreement",
               value: (
                 <>
                   {target.programName ?? "Not recorded"}
@@ -109,7 +144,7 @@ export function TargetDetailView({ target, canEdit }: { target: TargetDetail; ca
                       rel="noreferrer noopener"
                       target="_blank"
                     >
-                      Open program<span className="sr-only"> in a new tab</span>
+                      Open reference<span className="sr-only"> in a new tab</span>
                     </a>
                   ) : null}
                 </>
@@ -121,7 +156,7 @@ export function TargetDetailView({ target, canEdit }: { target: TargetDetail; ca
               value: <ResearchTime date={target.authorizationDate} />,
             },
             {
-              label: "Notes",
+              label: "Permission notes",
               value: (
                 <p className="whitespace-pre-wrap text-text-secondary">
                   {target.authorizationNotes ?? "No notes recorded."}

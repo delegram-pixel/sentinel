@@ -2,6 +2,8 @@
 
 # Database Schema & Data Architecture
 
+Current AI additions are specified in [Multi-model intelligence](AI-MULTI-MODEL.md#persistence-failure-recovery-and-rollout): `GEMINI`/`OPENROUTER` provider enums, `AICollaboration`, `AITask.executionState` and stage evaluations, and attempt identity/usage/delivery/cost metadata. Source snapshots retain their immutable database guard. Historical task output and conversation contracts are preserved. The three `20261111` migrations add these fields, widen positive attempt sequences, enforce collaboration stages and add accounting indexes.
+
 **Version:** 1.0
 **Database:** PostgreSQL, neon
 **ORM:** Prisma
@@ -447,8 +449,10 @@ Redaction methods:
 - CLIENT_MASK
 - HUMAN_REVIEW
 
-Store binary content in private object storage, not PostgreSQL. Objects live under a quarantined key
-until a human reviewer resolves redaction, then under an immutable active key
+Store binary content in private storage, not PostgreSQL. An UploadThing object key is held in
+`quarantineKey` until a human reviewer resolves redaction; approval moves it to `storageKey` and
+clears `quarantineKey` without copying or renaming the object. In the local development adapter the
+keys follow the quarantine/active split
 (`quarantine/{workspaceId}/{evidenceId}/{uploadId}` and
 `evidence/{workspaceId}/{investigationId}/{evidenceId}/v{version}`). Corrections create a new
 `version` with `supersedesId` rather than overwriting the active object, and deletion is soft via

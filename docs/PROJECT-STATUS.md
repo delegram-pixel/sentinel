@@ -125,23 +125,25 @@ workspace at `/dashboard/investigations/[investigationId]/ai`. Reports are live 
 
 - Evidence belongs to one investigation and is workspace-scoped. It links to findings only through
   `EvidenceLink` with `SUPPORTS`, `CONTRADICTS`, `CONTEXT`, or `REPRODUCTION`.
-- Upload uses the two-step presigned flow from ADR-004 and ADR-013:
-  1. `POST /api/evidence/upload-url` validates authentication, workspace access, investigation state,
-     MIME type, size, and the declared checksum, creates a quarantined record, and returns a
-     five-minute presigned PUT URL.
-  2. `POST /api/evidence/[evidenceId]/finalize` reads the object, verifies size, SHA-256 checksum,
-     and magic bytes, runs the advisory sensitive-data scan, and marks the record `NOT_REVIEWED` or
-     `QUARANTINED`.
+- Upload uses the direct-upload flow from ADR-004, ADR-013, and ADR-019:
+  1. `POST /api/evidence/upload-intent` validates authentication, workspace access, investigation
+     state, MIME type, size, and the declared checksum, creates a quarantined record, and returns an
+     UploadThing intent. The local development fallback returns a five-minute presigned PUT URL.
+  2. The browser uploads through the authenticated `evidenceUploader` UploadThing FileRouter route.
+  3. `POST /api/evidence/[evidenceId]/finalize` downloads the private object, verifies size, SHA-256
+     checksum, and magic bytes, runs the advisory sensitive-data scan, and marks the record
+     `NOT_REVIEWED` or `QUARANTINED`.
 - Files are limited to 25 MB. The MIME allowlist covers PNG, JPEG, WebP, PDF, text, CSV, JSON, XML,
   and NDJSON; HTML and SVG are rejected. Declared and detected types must be compatible.
 - Text evidence supports client-side editing before upload, and the upload form computes the SHA-256
   checksum in the browser. The UI states that client-side redaction cannot be independently
   guaranteed.
 - Only a human reviewer may resolve redaction. Approval without change records `VERIFIED_SAFE`;
-  approval of a sanitized replacement records `REDACTED`; rejection deletes the quarantine object
+  approval of a sanitized replacement records `REDACTED`; rejection deletes the private object
   and requires a replacement.
-- Activation copies the object to the immutable active prefix, re-verifies the checksum, records the
-  reviewer and timestamp, and deletes the quarantine object. Active evidence cannot be reviewed or
+- Activation happens in place: the private UploadThing object is kept, `storageKey` is set, and
+  `quarantineKey` is cleared. The server re-verifies the checksum, records the reviewer and
+  timestamp, and never copies or renames the object. Active evidence cannot be reviewed or
   overwritten again.
 - Only `REDACTED` or `VERIFIED_SAFE` evidence may link to a finding or enter AI context. Pending and
   quarantined evidence is visible only to its uploader, the workspace owner, and reviewers.
@@ -149,13 +151,14 @@ workspace at `/dashboard/investigations/[investigationId]/ai`. Reports are live 
   Quarantine downloads are restricted to the uploader and reviewers.
 - Deletion is soft and blocked while the evidence is linked to a finding. Both active and quarantine
   objects are removed from storage.
-- The storage adapter is an interface with an S3-compatible adapter for R2 and a local filesystem
-  adapter for development when storage variables are absent. The local adapter uses HMAC-signed
-  development-only routes at `/api/evidence/local-upload` and `/api/evidence/local-download`.
+- The storage adapter is an interface with an UploadThing adapter for production and a local
+  filesystem adapter for development when `UPLOADTHING_TOKEN` is absent. The local adapter uses
+  HMAC-signed development-only routes at `/api/evidence/local-upload` and
+  `/api/evidence/local-download`.
 - Evidence and findings appear in investigation details and on their own list, detail, upload, and
   edit pages. The dashboard shows the five most recent evidence records with investigation, redaction
   status, and a link to the evidence library. Relationship and metadata forms are Server Actions; only
-  presigned upload, finalize, and download are Route Handlers (ADR-009).
+  upload intent, finalize, download, and the UploadThing FileRouter are Route Handlers (ADR-009).
 - Every evidence page and Server Action re-resolves `getSessionContext()` and treats foreign
   evidence as absent. Evidence mutations write allow-listed audit events.
 
@@ -164,7 +167,7 @@ workspace at `/dashboard/investigations/[investigationId]/ai`. Reports are live 
 - The Prisma schema includes `Evidence` with quarantine/active keys, checksum, advisory scan
   results, redaction method, reviewer, activation, version, supersede, and soft-delete fields.
 - `Evidence.fileName` was added by migration `20261106220000_evidence_file_name`.
-- AWS SDK dependencies support the R2/S3 adapter.
+- UploadThing provides private evidence storage; the AWS SDK is no longer a dependency.
 - `.data/` is gitignored for the local evidence adapter.
 - Unit tests cover finding title normalization, confirmation/reportability readiness, severity
   validation, evidence MIME detection, intent validation, redaction policy, storage keys, and the

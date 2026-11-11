@@ -187,8 +187,8 @@ describe("AI task service", () => {
       expect(result.value.task.inputContext).toMatchObject({
         included: { evidence: 2 },
         evidence: expect.arrayContaining([
-          { id: textEvidence.id, version: 2 },
-          { id: binaryEvidence.id, version: 1 },
+          { id: textEvidence.id, version: 2, checksum: textEvidence.checksum },
+          { id: binaryEvidence.id, version: 1, checksum: binaryEvidence.checksum },
         ]),
       });
     });

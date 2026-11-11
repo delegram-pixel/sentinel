@@ -1,4 +1,4 @@
-import type { AiModelTier, AiTaskProfile } from "./ai-config";
+import type { AiModelTier, AiTaskProfile, AiProviderName } from "./ai-config";
 
 /** ADR-025: total tokens a single user may consume in a rolling 24h window. */
 export const AI_DAILY_USER_TOKEN_CAP = 250_000;
@@ -34,7 +34,10 @@ export function estimateCostUsd(
   tier: AiModelTier,
   inputTokens: number,
   outputTokens: number,
+  provider: AiProviderName = "ANTHROPIC",
 ): number {
+  // ADR-033 pins Groq to its free plan; no paid fallback is selected.
+  if (provider === "GROQ") return 0;
   const pricing = MODEL_PRICING[tier];
 
   return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;

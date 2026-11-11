@@ -25,7 +25,7 @@ export default async function NewTargetPage({ params }: NewTargetPageProps) {
   return (
     <FormPage
       title="Register a target"
-      description="Add one asset and record your permission to research it. After saving, draft and activate a scope to define what you can test and when."
+      description="Add one asset and record the authorization context for it. Registering a target does not start testing. After saving, define and activate a research scope to set what you can test and when."
       backHref={`/dashboard/projects/${projectId}/targets`}
       backLabel="All targets"
     >

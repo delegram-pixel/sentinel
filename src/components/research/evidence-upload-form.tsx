@@ -164,7 +164,7 @@ export function EvidenceUploadForm({
       }
 
       const checksum = await sha256Hex(bytes);
-      const response = await fetch("/api/evidence/upload-url", {
+      const response = await fetch("/api/evidence/upload-intent", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -181,24 +181,39 @@ export function EvidenceUploadForm({
       });
       const intent = (await response.json()) as {
         evidenceId?: string;
-        uploadUrl?: string;
+        upload?: { kind: "UPLOADTHING" } | { kind: "LOCAL"; url: string; expiresAt: string };
         error?: string;
       };
 
-      if (!response.ok || !intent.evidenceId || !intent.uploadUrl) {
+      if (!response.ok || !intent.evidenceId || !intent.upload) {
         setError(intent.error ?? "The upload could not be started.");
         return;
       }
 
-      const upload = await fetch(intent.uploadUrl, {
-        method: "PUT",
-        headers: { "content-type": mimeType },
-        body: bytes,
-      });
+      if (intent.upload.kind === "LOCAL") {
+        const upload = await fetch(intent.upload.url, {
+          method: "PUT",
+          headers: { "content-type": mimeType },
+          body: bytes,
+        });
 
-      if (!upload.ok) {
-        setError("We couldn't upload this file. Try the upload again.");
-        return;
+        if (!upload.ok) {
+          setError("We couldn't upload this file. Try the upload again.");
+          return;
+        }
+      } else {
+        const uploadFile =
+          textContent !== null ? new File([bytes], file.name, { type: mimeType }) : file;
+        const { uploadEvidenceFile } = await import("@/lib/uploadthing-client");
+        const uploaded = await uploadEvidenceFile.uploadFiles("evidenceUploader", {
+          files: [uploadFile],
+          input: { evidenceId: intent.evidenceId },
+        });
+
+        if (!uploaded || uploaded.length === 0) {
+          setError("We couldn't upload this file. Try the upload again.");
+          return;
+        }
       }
 
       const finalize = await fetch(`/api/evidence/${intent.evidenceId}/finalize`, {

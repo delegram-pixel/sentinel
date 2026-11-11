@@ -2,6 +2,7 @@
 
 import { FieldHelpLabel } from "@/components/shared/field-help-label";
 
+import { FieldHint } from "@/components/shared/field-hint";
 import { useFormErrorFocus } from "@/components/shared/use-form-error-focus";
 
 import { LoaderCircle, Plus, Trash2 } from "lucide-react";
@@ -155,9 +156,18 @@ export function ScopeDraftForm({
               required
               aria-invalid={Boolean(state.fieldErrors?.effectiveFrom)}
               aria-describedby={
-                state.fieldErrors?.effectiveFrom ? "scope-effectiveFrom-error" : undefined
+                state.fieldErrors?.effectiveFrom
+                  ? "scope-effectiveFrom-error scope-effectiveFrom-hint"
+                  : "scope-effectiveFrom-hint"
               }
             />
+            <FieldHint
+              id="scope-effectiveFrom-hint"
+              example="2026-05-12"
+              note="The scope cannot allow an action before this date."
+            >
+              The first date the permission applies.
+            </FieldHint>
             <FieldError field="effectiveFrom" state={state} />
           </Field>
           <Field data-invalid={Boolean(state.fieldErrors?.effectiveUntil)}>
@@ -169,9 +179,18 @@ export function ScopeDraftForm({
               required
               aria-invalid={Boolean(state.fieldErrors?.effectiveUntil)}
               aria-describedby={
-                state.fieldErrors?.effectiveUntil ? "scope-effectiveUntil-error" : undefined
+                state.fieldErrors?.effectiveUntil
+                  ? "scope-effectiveUntil-error scope-effectiveUntil-hint"
+                  : "scope-effectiveUntil-hint"
               }
             />
+            <FieldHint
+              id="scope-effectiveUntil-hint"
+              example="2026-06-12"
+              note="Choose an end date you can justify from the permission."
+            >
+              The last date the permission applies.
+            </FieldHint>
             <FieldError field="effectiveUntil" state={state} />
           </Field>
         </FieldGroup>
@@ -206,7 +225,15 @@ export function ScopeDraftForm({
                   spellCheck={false}
                   value={row.assetIdentifier}
                   onChange={(event) => updateRow(row.id, { assetIdentifier: event.target.value })}
+                  aria-describedby={`asset-identifier-${row.id}-hint`}
                 />
+                <FieldHint
+                  id={`asset-identifier-${row.id}-hint`}
+                  example="app.example.test or https://app.example.test/login"
+                >
+                  The asset this rule covers. Use the identifier you registered for the target, or a
+                  specific part of it.
+                </FieldHint>
               </Field>
 
               <div className="grid gap-4 sm:grid-cols-3">
@@ -219,6 +246,7 @@ export function ScopeDraftForm({
                     onChange={(event) =>
                       updateRow(row.id, { assetType: event.target.value as AssetType })
                     }
+                    aria-describedby={`asset-type-${row.id}-hint`}
                   >
                     {ASSET_TYPES.map((type) => (
                       <option key={type} value={type}>
@@ -226,6 +254,12 @@ export function ScopeDraftForm({
                       </option>
                     ))}
                   </Select>
+                  <FieldHint
+                    id={`asset-type-${row.id}-hint`}
+                    example="Domain for app.example.test."
+                  >
+                    The format of the identifier above. It controls how the asset is validated.
+                  </FieldHint>
                 </Field>
 
                 <Field>
@@ -246,6 +280,7 @@ export function ScopeDraftForm({
                     name="matchType"
                     value={row.matchType}
                     onChange={(event) => updateRow(row.id, { matchType: event.target.value })}
+                    aria-describedby={`match-type-${row.id}-hint`}
                   >
                     {SCOPE_ASSET_MATCH_TYPES.map((type) => (
                       <option key={type} value={type}>
@@ -253,6 +288,13 @@ export function ScopeDraftForm({
                       </option>
                     ))}
                   </Select>
+                  <FieldHint
+                    id={`match-type-${row.id}-hint`}
+                    example="Use Exact for one specific URL. Use a domain rule only if your permission covers that domain."
+                  >
+                    How the rule compares an asset to the identifier. Broader patterns can include
+                    more assets, so check the boundaries.
+                  </FieldHint>
                 </Field>
 
                 <Field>
@@ -272,6 +314,7 @@ export function ScopeDraftForm({
                     name="effect"
                     value={row.effect}
                     onChange={(event) => updateRow(row.id, { effect: event.target.value })}
+                    aria-describedby={`effect-${row.id}-hint`}
                   >
                     {SCOPE_ASSET_EFFECTS.map((effect) => (
                       <option key={effect} value={effect}>
@@ -279,6 +322,13 @@ export function ScopeDraftForm({
                       </option>
                     ))}
                   </Select>
+                  <FieldHint
+                    id={`effect-${row.id}-hint`}
+                    example="Allow the assessment domain, then exclude any third-party asset your agreement doesn't cover."
+                    note="If an allow rule and an exclusion both match, the exclusion wins."
+                  >
+                    Whether this rule allows or excludes the asset.
+                  </FieldHint>
                 </Field>
               </div>
 
@@ -292,7 +342,15 @@ export function ScopeDraftForm({
                     autoComplete="off"
                     value={row.notes}
                     onChange={(event) => updateRow(row.id, { notes: event.target.value })}
+                    aria-describedby={`asset-notes-${row.id}-hint`}
                   />
+                  <FieldHint
+                    id={`asset-notes-${row.id}-hint`}
+                    example="Third-party payment page is out of scope."
+                  >
+                    Why this asset is included or excluded. This is for the reviewer and does not
+                    change what the rule matches.
+                  </FieldHint>
                 </Field>
                 {rows.length > 1 ? (
                   <Button
@@ -380,9 +438,17 @@ export function ScopeDraftForm({
               placeholder="Why this window, these assets, and these activities?"
               aria-invalid={Boolean(state.fieldErrors?.attestationNotes)}
               aria-describedby={
-                state.fieldErrors?.attestationNotes ? "scope-attestationNotes-error" : undefined
+                state.fieldErrors?.attestationNotes
+                  ? "scope-attestationNotes-error scope-attestationNotes-hint"
+                  : "scope-attestationNotes-hint"
               }
             />
+            <FieldHint
+              id="scope-attestationNotes-hint"
+              example="Short maintenance window agreed with the app owner."
+            >
+              Background for the reviewer: why this window, these assets, and these activities.
+            </FieldHint>
             <FieldError field="attestationNotes" state={state} />
           </Field>
         </FieldGroup>

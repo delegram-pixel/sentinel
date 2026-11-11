@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { conclusionReviewSchema } from "./collaboration-output";
 
 import type { AiTaskType } from "./ai-config";
 import {
@@ -172,6 +173,7 @@ export function outputKindForTask(taskType: AiTaskType): AiOutputKind | null {
 }
 
 export function outputSchemaForTask(taskType: AiTaskType): z.ZodType | null {
+  if (taskType === "RESEARCH_CONCLUSION_REVIEW") return conclusionReviewSchema;
   if (taskType === "PATTERN_ANALYSIS") return patternAnalysisOutputSchema;
   if (taskType === "EVIDENCE_REVIEW") return evidenceAnalysisOutputSchema;
   if (taskType === "FALSE_POSITIVE_REVIEW") return independentVerificationOutputSchema;

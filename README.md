@@ -8,8 +8,9 @@ human-verified conclusions.
 > connected. Dashboard shows real workspace counts and the five newest audit events; Settings
 > shows the authenticated profile, membership, and the newest 20 workspace audit events.
 > Project screens are connected. Target and scope interface work continues in Phase 3.
-> AI integration and evidence storage are still unimplemented. Nothing in this build can contact
-> a real target. See the [current checkpoint](docs/PROJECT-STATUS.md).
+> The [current checkpoint](docs/PROJECT-STATUS.md) supersedes this historical Phase 3 description.
+> AI supports Groq and optional Gemini/OpenRouter through the central orchestrator; see the
+> [multi-model configuration and rollout guide](docs/AI-MULTI-MODEL.md). No autonomous target tools are introduced.
 
 ## Requirements
 
@@ -23,6 +24,8 @@ yarn install
 cp .env.example .env.local
 yarn dev
 ```
+
+AI credentials are optional and server-only. Defaults retain free Groq with `AI_ROUTING_MODE=LEGACY`; live Groq requires its ZDR attestation. To use Gemini/OpenRouter, follow `.env.example` and the [runtime guide](docs/AI-MULTI-MODEL.md): explicit paid opt-in, spending caps and provider privacy approvals are required. Run `yarn db:deploy`, `yarn db:generate` and `yarn worker` for durable AI work. `AI_USE_MOCK_PROVIDER=true` enables development mocks; `yarn ai:evaluate` scores synthetic/archived outputs without API calls.
 
 Open <http://localhost:3000>. The authenticated workspace is at `/dashboard`; account, workspace,
 membership, and audit details are at `/dashboard/settings`.

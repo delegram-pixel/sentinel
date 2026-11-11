@@ -17,12 +17,9 @@ const completeProductionEnv = {
   CLERK_WEBHOOK_SIGNING_SECRET: "whsec_123",
   UPSTASH_REDIS_REST_URL: "https://redis.example",
   UPSTASH_REDIS_REST_TOKEN: "redis_token",
-  ANTHROPIC_API_KEY: "sk-ant-123",
-  STORAGE_ENDPOINT: "https://storage.example",
-  STORAGE_REGION: "auto",
-  STORAGE_BUCKET: "sentinel-evidence",
-  STORAGE_ACCESS_KEY_ID: "key",
-  STORAGE_SECRET_ACCESS_KEY: "secret",
+  UPLOADTHING_TOKEN: "ut_token",
+  GROQ_API_KEY: "gsk_123",
+  GROQ_ZDR_ENABLED: "true",
 } as const;
 
 describe("environment contract", () => {
@@ -39,17 +36,16 @@ describe("environment contract", () => {
     const env = parseServerEnv({
       DATABASE_URL: "",
       CLERK_SECRET_KEY: "   ",
-      STORAGE_ENDPOINT: "",
+      UPLOADTHING_TOKEN: "",
     });
 
     expect(env.DATABASE_URL).toBeUndefined();
     expect(env.CLERK_SECRET_KEY).toBeUndefined();
-    expect(env.STORAGE_ENDPOINT).toBeUndefined();
+    expect(env.UPLOADTHING_TOKEN).toBeUndefined();
   });
 
   it("rejects malformed urls and unknown log levels", () => {
     expect(() => parseServerEnv({ NEXT_PUBLIC_APP_URL: "not-a-url" })).toThrow();
-    expect(() => parseServerEnv({ STORAGE_ENDPOINT: "ftp://nope" })).toThrow();
     expect(() => parseServerEnv({ LOG_LEVEL: "verbose" })).toThrow();
   });
 
@@ -70,12 +66,12 @@ describe("environment contract", () => {
     const missing = missingProductionEnv({
       NODE_ENV: "production",
       DATABASE_URL: "  ",
-      STORAGE_BUCKET: "sentinel-evidence",
+      UPLOADTHING_TOKEN: "ut_token",
     });
 
     expect(missing).toContain("DATABASE_URL");
     expect(missing).toContain("CLERK_SECRET_KEY");
-    expect(missing).not.toContain("STORAGE_BUCKET");
+    expect(missing).not.toContain("UPLOADTHING_TOKEN");
   });
 
   it("does not enforce production secrets outside production", () => {
@@ -92,6 +88,6 @@ describe("environment contract", () => {
   it("passes when every production variable is present", () => {
     expect(missingProductionEnv(completeProductionEnv)).toEqual([]);
     expect(() => assertProductionEnv(completeProductionEnv)).not.toThrow();
-    expect(REQUIRED_PRODUCTION_ENV).toHaveLength(12);
+    expect(REQUIRED_PRODUCTION_ENV).toHaveLength(7);
   });
 });

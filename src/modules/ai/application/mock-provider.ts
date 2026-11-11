@@ -133,6 +133,34 @@ function validOutput(taskType: AiTaskType, request?: AiProviderRequest): unknown
         remediation: "Unknown",
         evidenceReferences: [],
       };
+    case "RESEARCH_CONCLUSION_REVIEW": {
+      const history = [
+        ...(request?.system ?? "").matchAll(/<untrusted_data[^>]*>([\s\S]*?)<\/untrusted_data>/g),
+      ]
+        .flatMap((match) => {
+          try {
+            return [JSON.parse(match[1]!)];
+          } catch {
+            return [];
+          }
+        })
+        .filter(
+          (record) => record.sourceType === "AI_TASK" && Array.isArray(record.output?.claims),
+        );
+      return {
+        reviews: history.flatMap((record) =>
+          record.output.claims.map((claim: { id: string }) => ({
+            taskId: record.id,
+            claimId: claim.id,
+            verdict: "INSUFFICIENT",
+            reasoning: "Mock output requires human assessment.",
+            sources: [],
+          })),
+        ),
+        conclusions: [],
+        missingInformation: ["No live assessment was performed."],
+      };
+    }
   }
 }
 
@@ -204,7 +232,7 @@ export class MockAIProvider implements AIProvider {
         break;
     }
 
-    const structured =
+    let structured =
       this.scenario === "malformed"
         ? malformedOutput(request.taskType)
         : this.scenario === "schema_error"
@@ -212,6 +240,39 @@ export class MockAIProvider implements AIProvider {
           : this.scenario === "unknown_reference"
             ? unknownReferenceOutput(request.taskType)
             : (this.outputs[request.taskType] ?? validOutput(request.taskType, request));
+    if (this.scenario === "valid") {
+      if (["BATCH_REVIEW", "BATCH_MERGE"].includes(request.purpose ?? "")) {
+        const batch = JSON.parse(request.messages.at(-1)!.content).untrustedBatch;
+        structured = {
+          summary: "Mock provisional notes; no assessment was performed.",
+          sourceIds: Array.isArray(batch)
+            ? [...new Set(batch.flatMap((note) => note.sourceIds))]
+            : batch.sourceIds,
+          contradictions: [],
+          missingInformation: ["Human assessment is required."],
+        };
+      } else if (request.purpose === "SOURCE_CHECK") structured = { problems: [] };
+      else if (
+        (request.structuredOutput.schema.properties as Record<string, unknown> | undefined)
+          ?.analysis
+      ) {
+        structured = {
+          version: 1,
+          analysis: structured,
+          claims: [
+            {
+              id: "claim-mock-limitation",
+              statement: "The mock provider did not assess the target.",
+              basis: "UNKNOWN",
+              sources: [],
+              confidence: "low",
+              limitations: ["A human must assess the original evidence."],
+            },
+          ],
+          conclusions: [],
+        };
+      }
+    }
 
     return {
       structured,
@@ -221,6 +282,7 @@ export class MockAIProvider implements AIProvider {
         outputTokens: 120,
       },
       stopReason: "tool_use",
+      model: request.model,
     };
   }
 }

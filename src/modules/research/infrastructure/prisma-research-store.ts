@@ -635,7 +635,10 @@ export class PrismaResearchStore
     const count = await this.db.target.count({
       where: {
         projectId,
-        assetIdentifier,
+        // Asset identifiers such as domains are case-insensitive. Comparing
+        // without case keeps duplicates out of the application even though the
+        // database's unique constraint remains case-sensitive.
+        assetIdentifier: { equals: assetIdentifier, mode: "insensitive" },
         ...(excludeTargetId ? { id: { not: excludeTargetId } } : {}),
       },
     });

@@ -10,6 +10,7 @@ export const AI_TASK_TYPES = [
   "REPORT_GENERATION",
   "SESSION_SUMMARY",
   "PATTERN_ANALYSIS",
+  "RESEARCH_CONCLUSION_REVIEW",
 ] as const;
 
 export type AiTaskType = (typeof AI_TASK_TYPES)[number];
@@ -24,9 +25,18 @@ export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
   REPORT_GENERATION: "Report generation",
   SESSION_SUMMARY: "Session summary",
   PATTERN_ANALYSIS: "Pattern analysis",
+  RESEARCH_CONCLUSION_REVIEW: "Research conclusion review",
 };
 
 export type AiModelTier = "SONNET" | "HAIKU";
+
+export const AI_PROVIDER_NAMES = ["GROQ", "ANTHROPIC", "GEMINI", "OPENROUTER"] as const;
+export type AiProviderName = (typeof AI_PROVIDER_NAMES)[number];
+
+export const GROQ_AI_MODELS = {
+  SONNET: "openai/gpt-oss-120b",
+  HAIKU: "openai/gpt-oss-20b",
+} as const satisfies Record<AiModelTier, string>;
 
 export const DEFAULT_AI_MODELS: Record<AiModelTier, string> = {
   SONNET: "claude-sonnet-4-5",
@@ -34,6 +44,7 @@ export const DEFAULT_AI_MODELS: Record<AiModelTier, string> = {
 };
 
 export type AiModelOverrides = {
+  provider?: AiProviderName;
   researchModel?: string;
   summaryModel?: string;
 };
@@ -60,6 +71,14 @@ const INVESTIGATION_CAPABILITIES = [
 ] as const satisfies readonly Capability[];
 
 export const AI_TASK_PROFILES: Record<AiTaskType, AiTaskProfile> = {
+  RESEARCH_CONCLUSION_REVIEW: {
+    tier: "SONNET",
+    inputTokenBudget: 60000,
+    outputTokenBudget: 4000,
+    promptId: "research.conclusion-review",
+    requiredCapabilities: INVESTIGATION_CAPABILITIES,
+    supportsConversation: false,
+  },
   PATTERN_ANALYSIS: {
     tier: "SONNET",
     inputTokenBudget: 40000,
@@ -136,12 +155,13 @@ export const AI_TASK_PROFILES: Record<AiTaskType, AiTaskProfile> = {
 
 export function modelForTask(taskType: AiTaskType, overrides: AiModelOverrides = {}): string {
   const tier = AI_TASK_PROFILES[taskType].tier;
+  const defaults = overrides.provider === "GROQ" ? GROQ_AI_MODELS : DEFAULT_AI_MODELS;
 
   if (tier === "SONNET") {
-    return overrides.researchModel?.trim() || DEFAULT_AI_MODELS.SONNET;
+    return overrides.researchModel?.trim() || defaults.SONNET;
   }
 
-  return overrides.summaryModel?.trim() || DEFAULT_AI_MODELS.HAIKU;
+  return overrides.summaryModel?.trim() || defaults.HAIKU;
 }
 
 export function isSupportedTaskType(taskType: AiTaskType): boolean {
@@ -159,6 +179,7 @@ export function assistantRoleForTask(taskType: AiTaskType): string {
       return "RESEARCH_ASSISTANT";
     case "EVIDENCE_REVIEW":
     case "FALSE_POSITIVE_REVIEW":
+    case "RESEARCH_CONCLUSION_REVIEW":
       return "VERIFICATION_ASSISTANT";
     case "FINDING_SUMMARY":
     case "REPORT_GENERATION":

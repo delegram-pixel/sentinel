@@ -1,11 +1,11 @@
 import type { AuditEvent } from "@/modules/audit/domain/audit";
 import type { Capability } from "@/modules/security/domain/capability";
 
-import type { AiTaskType } from "../domain/ai-config";
+import type { AiTaskType, AiProviderName } from "../domain/ai-config";
 import type { AiTaskEventType, AiTaskStatus } from "../domain/ai-task-status";
 import type { AiProviderRequest, AiProviderResponse } from "./provider";
 
-export type AiProviderName = "ANTHROPIC";
+export type { AiProviderName } from "../domain/ai-config";
 
 export type AiAuditDraft = Omit<AuditEvent, "entityId">;
 
@@ -38,6 +38,9 @@ export type AiConversationDetail = AiConversationRow & {
 };
 
 export type AiTaskRow = {
+  collaborationId?: string | null;
+  collaborationStage?: string | null;
+  evaluation?: unknown;
   usageUncertain?: boolean;
   usageReconciledAt?: Date | null;
   reservedTokens?: number;
@@ -51,6 +54,7 @@ export type AiTaskRow = {
   status: AiTaskStatus;
   assignedRole: string | null;
   inputContext: unknown | null;
+  executionState?: unknown | null;
   output: unknown | null;
   errorMessage: string | null;
   failureCode: string | null;
@@ -253,6 +257,9 @@ export type AiMessageCreateData = {
 };
 
 export type AiTaskCreateData = {
+  collaborationId?: string;
+  collaborationStage?: string;
+  reservationTokens?: number;
   executionJobId?: string;
   executorToken?: string;
   requestHash?: string;
@@ -277,6 +284,8 @@ export type AiTaskCreateData = {
 };
 
 export type AiTaskUpdateData = {
+  provider?: AiProviderName;
+  evaluation?: unknown;
   executionJobId?: string;
   executorToken?: string;
   status?: AiTaskStatus;
@@ -321,6 +330,7 @@ export interface AiStore {
     attemptId: string,
     response: AiProviderResponse | null,
     failureCode?: string,
+    delivery?: "REJECTED" | "UNCERTAIN",
   ): Promise<void>;
   resultMessage(workspaceId: string, taskId: string): Promise<AiMessageRow | null>;
   completeTask(
@@ -334,6 +344,7 @@ export interface AiStore {
     investigationId: string,
     conversationId?: string,
     requestedBy?: string,
+    preserveAll?: boolean,
   ): Promise<AiContextRecord | null>;
   listConversations(workspaceId: string, investigationId: string): Promise<AiConversationRow[]>;
   findConversation(

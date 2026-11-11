@@ -14,6 +14,7 @@ export interface JobStore {
   claim(): Promise<JobRow | null>;
   heartbeat(job: JobRow, progress?: number): Promise<boolean>;
   finish(job: JobRow, result: unknown): Promise<boolean>;
+  defer(job: JobRow, availableAt: Date, progress: number): Promise<boolean>;
   fail(job: JobRow, failureCode: string, retryable: boolean): Promise<boolean>;
 }
 export async function enqueueResearchJob(

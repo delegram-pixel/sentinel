@@ -11,6 +11,8 @@
 **Database:** PostgreSQL + Prisma ORM  
 **Initial AI Provider:** Anthropic Claude
 
+**Current AI runtime:** [Multi-model intelligence](AI-MULTI-MODEL.md) extends the existing modular monolith and durable worker with provider adapters, a model registry and controlled collaboration. Groq remains the default; Gemini and OpenRouter require explicit configuration. ADR-034 supersedes provider-specific assignments in this original blueprint.
+
 ---
 
 # 1. Technical Overview
@@ -73,7 +75,7 @@ Microservices will not be introduced during the initial development phase.
 | Forms | React Hook Form |
 | Server State | TanStack Query where needed |
 | Client State | Zustand where needed |
-| File Storage | S3-compatible private object storage |
+| File Storage | UploadThing private storage |
 | Notifications | Sonner |
 | Charts | Recharts |
 | Testing | Vitest and Playwright |
@@ -548,9 +550,11 @@ PATCH  /api/findings/[findingId]
 
 ```text
 GET    /api/evidence
-POST   /api/evidence/upload-url
+POST   /api/evidence/upload-intent
+POST   /api/evidence/[evidenceId]/finalize
 GET    /api/evidence/[evidenceId]
 DELETE /api/evidence/[evidenceId]
+POST   /api/uploadthing
 ```
 
 ### AI Tasks
@@ -923,15 +927,16 @@ An AI assistant must never be allowed to create, approve, or expand an authoriza
 
 ## 10.1 Storage Strategy
 
-Use private Cloudflare R2 object storage, accessed through the S3-compatible API, for uploaded files
-(ADR-019). The bucket has no public access and no public object URLs.
+Use private UploadThing storage for uploaded evidence files (ADR-019). The app uses the private ACL,
+so there is no public access and no public object URL. The browser uploads directly through the
+authenticated `evidenceUploader` FileRouter route; files never pass through the application server.
 
 Store file metadata in PostgreSQL. Do not store large screenshots, recordings, documents, or raw
 evidence bodies in database records.
 
-The storage adapter is an interface. Moving to AWS S3 or another S3-compatible provider must not
-change domain or application code. Development may use a local filesystem adapter when the storage
-variables are absent; production requires R2 and fails fast without it.
+The storage adapter is an interface. Moving to another storage provider must not change domain or
+application code. Development and tests may use a local filesystem adapter when `UPLOADTHING_TOKEN`
+is absent; production requires UploadThing and fails fast without the token.
 
 ## 10.2 Evidence Types
 
@@ -997,11 +1002,12 @@ Server checks authentication, workspace access, scope,
 MIME type, size, and checksum declaration
        |
        v
-Server creates quarantined evidence record and
-returns short-lived presigned PUT URL
+Server creates quarantined evidence record and returns
+an UploadThing intent (local dev: presigned PUT URL)
        |
        v
-Client uploads directly to the quarantine prefix
+Client uploads directly through the authenticated
+UploadThing FileRouter (local dev: quarantine prefix)
        |
        v
 Client calls finalize
@@ -1018,29 +1024,31 @@ Human reviewer approves without change (VERIFIED_SAFE),
 approves a sanitized replacement (REDACTED), or rejects
        |
        v
-Server copies the object to the immutable active prefix,
-re-verifies the checksum, records the reviewer, and
-deletes the quarantine object
+Server activates the private object in place, re-verifies
+the checksum, records the reviewer, and clears the
+quarantine state
        |
        v
 Approved evidence may link to findings and enter AI context
 ```
 
-Key scheme (ADR-019):
+Key handling (ADR-019):
 
-```text
-quarantine/{workspaceId}/{evidenceId}/{uploadId}
-evidence/{workspaceId}/{investigationId}/{evidenceId}/v{version}
-authorization/{workspaceId}/{scopeVersionId}/{artifactId}
-```
+- UploadThing returns a private file key for each upload. The record keeps that key in
+  `quarantineKey` until a reviewer approves it, then moves it to `storageKey` and clears
+  `quarantineKey`. No object is copied or renamed during promotion.
+- The local development adapter keeps the quarantine/active split
+  `quarantine/{workspaceId}/{evidenceId}/{uploadId}` and
+  `evidence/{workspaceId}/{investigationId}/{evidenceId}/v{version}`.
+- Authorization artifacts remain a separate concern and are limited to 10 MB.
 
-Presigned PUT and GET URLs expire after five minutes. Evidence files are limited to 25 MB;
-authorization artifacts are limited to 10 MB. Multipart upload is deferred.
+Signed download URLs expire after five minutes. Evidence files are limited to 25 MB and the
+FileRouter accepts a single file. Multipart upload is deferred.
 
 The MIME allowlist is `image/png`, `image/jpeg`, `image/webp`, `application/pdf`, `text/plain`,
 `text/csv`, `application/json`, `application/xml`, `text/xml`, and `application/x-ndjson`.
-Anything else is rejected at upload intent. The server sniffs magic bytes on finalize and rejects a
-mismatch between the declared and detected type.
+Anything else is rejected by the FileRouter and at upload intent. The server sniffs magic bytes on
+finalize and rejects a mismatch between the declared and detected type.
 
 ## 10.5 Quarantine and AI Gate
 
@@ -1310,14 +1318,10 @@ GOOGLE_CLIENT_SECRET=
 # Anthropic
 ANTHROPIC_API_KEY=
 
-# Object Storage (private Cloudflare R2 bucket via the S3-compatible API)
-STORAGE_ENDPOINT=
-STORAGE_REGION=auto
-STORAGE_BUCKET=
-STORAGE_ACCESS_KEY_ID=
-STORAGE_SECRET_ACCESS_KEY=
-# Development-only local filesystem adapter signing secret; storage is
-# required in production and never falls back to local files.
+# Evidence Storage (private UploadThing app)
+UPLOADTHING_TOKEN=
+# Development-only filesystem fallback when the token is empty.
+EVIDENCE_LOCAL_DIR=
 EVIDENCE_LOCAL_SIGNING_SECRET=
 
 # Logging
@@ -1332,9 +1336,10 @@ Never commit `.env.local` or real credentials to GitHub.
 
 Keep private environment variables server-side. Only variables explicitly intended for browser use should use the `NEXT_PUBLIC_` prefix.
 
-The object storage variables describe a private Cloudflare R2 bucket (ADR-019). Production startup
-fails when they are missing; there is no silent fallback to local files. R2 credentials are scoped
-to the bucket and separated per environment.
+The evidence storage variables describe a private UploadThing app (ADR-019). The UploadThing app
+must use the private ACL. Production startup fails when `UPLOADTHING_TOKEN` is missing; there is no
+silent fallback to local files in production. Development and tests fall back to the local
+filesystem.
 
 ---
 

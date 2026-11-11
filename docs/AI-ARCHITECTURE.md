@@ -3,7 +3,9 @@
 
 **Version:** 1.0  
 **Status:** Initial Architecture Specification  
-**Primary AI Provider:** Anthropic Claude API
+**Current implementation:** Provider-neutral central orchestration with Groq legacy defaults and optional Gemini/Groq/OpenRouter routing (ADR-034).
+
+The current runtime, privacy policy, configuration, collaboration, accounting and recovery design is documented in [Multi-model intelligence](AI-MULTI-MODEL.md). The original specification below remains historical context; its Anthropic-only assignments are superseded by ADR-033 and ADR-034.
 
 ---
 

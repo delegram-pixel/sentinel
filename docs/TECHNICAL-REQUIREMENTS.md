@@ -77,7 +77,8 @@ Requirements:
 
 ### File Storage
 
-Use private Cloudflare R2 object storage, accessed through the S3-compatible API (ADR-019).
+Use private UploadThing storage for evidence files (ADR-019). The UploadThing app uses the private
+ACL; there is no public access and no public object URL.
 
 Store:
 - Screenshots.
@@ -87,15 +88,16 @@ Store:
 
 Store file metadata in PostgreSQL. Never store raw evidence bodies in the database.
 
-Evidence files are limited to 25 MB and authorization artifacts to 10 MB. Presigned PUT and GET
+Evidence files are limited to 25 MB and authorization artifacts to 10 MB. Browser uploads go
+directly through the authenticated `evidenceUploader` FileRouter route; signed GET URLs
 URLs expire after five minutes. The MIME allowlist is `image/png`, `image/jpeg`, `image/webp`,
 `application/pdf`, `text/plain`, `text/csv`, `application/json`, `application/xml`, `text/xml`, and
 `application/x-ndjson`; HTML and SVG are rejected. The server sniffs magic bytes on finalize and
 rejects a mismatch between the declared and detected type.
 
-Evidence uploads write to a quarantine prefix first. A human reviewer must resolve redaction before
-an object is copied to the immutable active prefix and becomes eligible for finding links, AI
-context, or report export (ADR-013).
+Evidence uploads are quarantined first by record state. A human reviewer must resolve redaction before
+the private object is activated in place and becomes eligible for finding links, AI context, or report
+export (ADR-013). Approval does not copy or rename the UploadThing object.
 
 ### Development Tools
 
@@ -411,28 +413,32 @@ Initial API domains:
 - PATCH `/api/findings/[id]`
 
 ### Evidence
-- POST `/api/evidence/upload-url`
+- POST `/api/evidence/upload-intent`
 - POST `/api/evidence/[evidenceId]/finalize`
 - GET `/api/evidence/[evidenceId]/download`
+- POST `/api/uploadthing` (UploadThing FileRouter)
 
-The evidence endpoints implement the two-step presigned flow (ADR-004, ADR-013, ADR-019):
+The evidence endpoints implement the direct-upload flow (ADR-004, ADR-013, ADR-019):
 
-1. `upload-url` validates authentication, workspace access, scope, MIME type, size, and the declared
-   checksum, creates a quarantined evidence record, and returns a short-lived presigned PUT URL for
-   the quarantine key.
-2. The client uploads directly to private object storage, then calls `finalize`. The server verifies
-   the object size, SHA-256 checksum, and magic bytes, runs the advisory sensitive-data scan, and
-   marks the record `NOT_REVIEWED` or `QUARANTINED`. The object is not active yet.
-3. A human reviewer resolves redaction through a Server Action. Approval copies the object to the
-   immutable active key, re-verifies the checksum, records the reviewer, and deletes the quarantine
-   object. Rejection deletes the quarantine object.
+1. `upload-intent` validates authentication, workspace access, scope, MIME type, size, and the
+   declared checksum, creates a quarantined evidence record, and returns `{ kind: "UPLOADTHING" }`.
+   The local development fallback returns a short-lived presigned PUT URL instead.
+2. The client uploads directly through the authenticated UploadThing FileRouter, then calls
+   `finalize`. The FileRouter enforces ownership, the MIME allowlist, a single file, and the size
+   limit. `finalize` verifies the object size, SHA-256 checksum, and magic bytes, runs the advisory
+   sensitive-data scan, and marks the record `NOT_REVIEWED` or `QUARANTINED`. The object is not
+   active yet.
+3. A human reviewer resolves redaction through a Server Action. Approval activates the private
+   object **in place** (sets `storageKey`, clears `quarantineKey`), re-verifies the checksum, and
+   records the reviewer; there is no copy or rename. Rejection deletes the private object.
 4. `download` performs a server-side authorization check and redirects to a short-lived signed URL.
 
 Evidence metadata updates, redaction review, link management, and soft deletion are Server Actions,
-not REST endpoints (ADR-009). Presigned PUT and GET URLs expire after five minutes. Evidence files
+not REST endpoints (ADR-009). Signed download URLs expire after five minutes. Evidence files
 are limited to 25 MB; the MIME allowlist is `image/png`, `image/jpeg`, `image/webp`,
 `application/pdf`, `text/plain`, `text/csv`, `application/json`, `application/xml`, `text/xml`, and
-`application/x-ndjson`. Anything else is rejected at upload intent, and finalize rejects a mismatch
+`application/x-ndjson`. Anything else is rejected at upload intent and by the FileRouter, and finalize
+rejects a mismatch
 between the declared and detected type.
 
 ### AI
@@ -485,9 +491,9 @@ Prisma will manage database access and migrations.
 - Enforce task budgets.
 
 ### Evidence Security
-- Validate file types.
+- Validate file types in the FileRouter and on finalize.
 - Limit upload size.
-- Use private object storage.
+- Use private UploadThing storage with the private ACL.
 - Generate short-lived download links.
 - Redact sensitive data.
 - Avoid storing unnecessary personal information.
@@ -578,7 +584,7 @@ Initial deployment:
 - Next.js hosting platform.
 - Managed PostgreSQL.
 - Managed authentication.
-- Private object storage.
+- Private UploadThing evidence storage.
 - AI provider API.
 
 Environments:

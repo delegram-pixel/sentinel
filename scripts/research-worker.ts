@@ -1,8 +1,6 @@
 import "dotenv/config";
 import { getDb } from "@/lib/db";
-import { PrismaAIStore } from "@/modules/ai/infrastructure/prisma-ai-store";
-import { createAIProvider, aiModelOverrides } from "@/modules/ai/infrastructure/provider-factory";
-import { createEvidenceStorage } from "@/modules/evidence/infrastructure/storage-factory";
+import { createAiDependencies } from "@/modules/ai/infrastructure/ai-dependencies";
 import { processNextResearchJob } from "@/modules/tasks/infrastructure/worker";
 const db = getDb();
 let stopping = false;
@@ -12,12 +10,7 @@ process.on("SIGINT", () => {
 process.on("SIGTERM", () => {
   stopping = true;
 });
-const deps = {
-  store: new PrismaAIStore(db),
-  provider: createAIProvider(),
-  evidenceStorage: createEvidenceStorage(),
-  modelOverrides: aiModelOverrides(),
-};
+const deps = createAiDependencies(db);
 try {
   do {
     const processed = await processNextResearchJob(db, deps);

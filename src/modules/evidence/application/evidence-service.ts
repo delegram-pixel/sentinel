@@ -113,12 +113,17 @@ export async function getEvidence(
   return evidence;
 }
 
+export type EvidenceUploadIntentValue = {
+  evidenceId: string;
+  upload: { kind: "UPLOADTHING" } | { kind: "LOCAL"; url: string; expiresAt: Date };
+};
+
 export async function createEvidenceUploadIntent(
   store: EvidenceStore,
   storage: EvidenceStorage,
   actor: EvidenceActor,
   rawInput: unknown,
-): Promise<DomainResult<{ evidenceId: string; uploadUrl: string; expiresAt: Date }>> {
+): Promise<DomainResult<EvidenceUploadIntentValue>> {
   const parsed = evidenceIntentSchema.safeParse(rawInput);
 
   if (!parsed.success) {
@@ -146,12 +151,17 @@ export async function createEvidenceUploadIntent(
   const evidenceId = randomUUID();
   const uploadId = randomUUID();
   const key = quarantineStorageKey(actor.workspaceId, evidenceId, uploadId);
-
-  const upload = await storage.createUploadTarget({
-    key,
-    mimeType: parsed.data.mimeType,
-    expiresInSeconds: UPLOAD_URL_SECONDS,
-  });
+  const upload: EvidenceUploadIntentValue["upload"] =
+    storage.kind === "UPLOADTHING"
+      ? { kind: "UPLOADTHING" }
+      : {
+          kind: "LOCAL",
+          ...(await storage.createUploadTarget({
+            key,
+            mimeType: parsed.data.mimeType,
+            expiresInSeconds: UPLOAD_URL_SECONDS,
+          })),
+        };
 
   await store.createEvidence(
     {
@@ -166,7 +176,7 @@ export async function createEvidenceUploadIntent(
       fileSize: parsed.data.fileSize,
       checksum: parsed.data.checksum.toLowerCase(),
       source: parsed.data.source,
-      quarantineKey: key,
+      quarantineKey: storage.kind === "UPLOADTHING" ? null : key,
       uploadedBy: actor.userId,
     },
     auditDraft(actor, "EVIDENCE_UPLOAD_INTENT_CREATED", "Evidence", {
@@ -183,7 +193,7 @@ export async function createEvidenceUploadIntent(
 
   return {
     ok: true,
-    value: { evidenceId, uploadUrl: upload.url, expiresAt: upload.expiresAt },
+    value: { evidenceId, upload },
   };
 }
 
@@ -470,6 +480,8 @@ export async function reviewEvidenceRedaction(
     );
   }
 
+  const quarantineKey = evidence.quarantineKey;
+
   if (parsed.data.decision === "REJECT") {
     const rejected = await store.rejectEvidence(
       actor.workspaceId,
@@ -485,7 +497,7 @@ export async function reviewEvidenceRedaction(
 
     if (rejected) {
       try {
-        await storage.deleteObject(evidence.quarantineKey);
+        await storage.deleteObject(quarantineKey);
       } catch {
         /* The recorded cleanup job retains the original key and retries. */
       }
@@ -508,12 +520,10 @@ export async function reviewEvidenceRedaction(
 
   const nextStatus: "REDACTED" | "VERIFIED_SAFE" =
     parsed.data.decision === "APPROVE_REDACTED" ? "REDACTED" : "VERIFIED_SAFE";
-  const destination = activeStorageKey(
-    actor.workspaceId,
-    evidence.investigationId,
-    evidence.id,
-    evidence.version,
-  );
+  const inPlace = storage.promotionMode === "IN_PLACE";
+  const destination = inPlace
+    ? quarantineKey
+    : activeStorageKey(actor.workspaceId, evidence.investigationId, evidence.id, evidence.version);
 
   const activationData = {
     storageKey: destination,
@@ -526,13 +536,16 @@ export async function reviewEvidenceRedaction(
     activatedAt: now,
   };
   await store.prepareActivation(actor, evidenceId, activationData);
-  try {
-    await storage.copyObject(evidence.quarantineKey, destination);
-  } catch {
-    return failure(
-      "EVIDENCE_ACTIVATION_RETRY_QUEUED",
-      "Your review is saved, but moving the file out of quarantine needs a retry. It's queued, and the quarantined original is still retained.",
-    );
+
+  if (!inPlace) {
+    try {
+      await storage.copyObject(quarantineKey, destination);
+    } catch {
+      return failure(
+        "EVIDENCE_ACTIVATION_RETRY_QUEUED",
+        "Your review is saved, but moving the file out of quarantine needs a retry. It's queued, and the quarantined original is still retained.",
+      );
+    }
   }
 
   const copy = await storage.getObject(destination);
@@ -575,10 +588,12 @@ export async function reviewEvidenceRedaction(
     );
   }
 
-  try {
-    await storage.deleteObject(evidence.quarantineKey);
-  } catch {
-    /* The promotion job retries cleanup after the verified activation. */
+  if (!inPlace) {
+    try {
+      await storage.deleteObject(quarantineKey);
+    } catch {
+      /* The promotion job retries cleanup after the verified activation. */
+    }
   }
 
   return { ok: true, value: { id: activated.id, redactionStatus: activated.redactionStatus } };

@@ -303,19 +303,20 @@ Hypothesis statuses:
    states that client-side redaction cannot be independently guaranteed.
 6. The application requests an upload intent. The server checks authentication, workspace access,
    scope, MIME type, size, and the declared checksum, creates a quarantined evidence record, and
-   returns a short-lived presigned PUT URL.
-7. The client uploads directly to the quarantine prefix in private object storage.
-8. The client calls finalize. The server verifies the object size, checksum, and magic bytes, runs the
-   advisory sensitive-data scan, and marks the record `NOT_REVIEWED` or `QUARANTINED`. The evidence
-   is not active yet.
+   returns an UploadThing upload intent (the local development fallback returns a presigned PUT URL).
+7. The client uploads directly through the authenticated UploadThing `evidenceUploader` FileRouter
+   route, which enforces ownership, the MIME allowlist, the 25 MB limit, and a single file.
+8. The client calls finalize. The server downloads the private object, verifies its size, checksum, and
+   magic bytes, runs the advisory sensitive-data scan, and marks the record `NOT_REVIEWED` or
+   `QUARANTINED`. The evidence is not active yet.
 9. Quarantined evidence is visible only to its uploader and reviewers. It is never linked to a
    finding, sent to AI, or included in a report.
 10. A human reviewer resolves redaction:
     - approve without change → `VERIFIED_SAFE`;
     - approve a sanitized replacement → `REDACTED`;
-    - reject → the quarantine object is deleted and the uploader must submit a replacement.
-11. On approval, the server copies the object to the immutable active prefix, re-verifies the
-    checksum, records the reviewer, and deletes the quarantine object.
+    - reject → the private object is deleted and the uploader must submit a replacement.
+11. On approval, the server activates the object in place, re-verifies the checksum, records the
+    reviewer, and clears the quarantine state. No copy, rename, or second upload occurs.
 12. Approved evidence is linked to the investigation or to a finding through `EvidenceLink` with a
     relationship type (`SUPPORTS`, `CONTRADICTS`, `CONTEXT`, or `REPRODUCTION`).
 13. User can review its history.

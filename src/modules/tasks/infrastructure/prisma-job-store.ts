@@ -83,6 +83,10 @@ export class PrismaJobStore implements JobStore {
         },
       });
       if (changed.count) {
+        await tx.aICollaboration.updateMany({
+          where: { jobId: id, status: "RUNNING" },
+          data: { status: "CANCELLED", completedAt: new Date() },
+        });
         await settleInterruptedAiTasks(tx, id, "CANCELLED", "AI_JOB_CANCELLED");
         await researchAudit(tx, actor, "BackgroundJob", id, "RESEARCH_JOB_CANCELLED", {});
       }
@@ -183,5 +187,30 @@ export class PrismaJobStore implements JobStore {
         await settleInterruptedAiTasks(tx, job.id, "FAILED", failureCode);
       return changed.count === 1;
     });
+  }
+  async defer(job: JobRow, availableAt: Date, progress: number) {
+    return (
+      (
+        await this.db.backgroundJob.updateMany({
+          where: {
+            id: job.id,
+            workspaceId: job.workspaceId,
+            status: "RUNNING",
+            leaseToken: job.leaseToken,
+            leaseUntil: { gt: new Date() },
+            cancelRequestedAt: null,
+          },
+          data: {
+            status: "QUEUED",
+            availableAt,
+            progress: Math.max(0, Math.min(99, progress)),
+            attempts: { decrement: 1 },
+            failureCode: null,
+            leaseToken: null,
+            leaseUntil: null,
+          },
+        })
+      ).count === 1
+    );
   }
 }
