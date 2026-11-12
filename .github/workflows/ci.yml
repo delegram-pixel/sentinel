@@ -88,7 +88,8 @@ jobs:
 
   e2e:
     name: End-to-end tests
-    runs-on: ubuntu-latest
+    # Keep Playwright's system dependencies on a predictable Ubuntu release.
+    runs-on: ubuntu-24.04
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_TEST_PUBLISHABLE_KEY }}
@@ -107,7 +108,19 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Install Playwright browser
-        run: yarn playwright install --with-deps chromium
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if yarn playwright install --with-deps chromium; then
+              exit 0
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "::error::Playwright browser installation failed after 3 attempts."
+              exit 1
+            fi
+            echo "::warning::Playwright browser installation failed; retrying in $((attempt * 5)) seconds."
+            sleep "$((attempt * 5))"
+          done
 
       - name: Run end-to-end tests
         run: yarn test:e2e

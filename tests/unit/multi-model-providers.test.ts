@@ -83,22 +83,20 @@ describe("provider adapters", () => {
   });
   it("requires approved OpenRouter hosts and constrains native schema/retention/routing", async () => {
     const r = { ...request, model: "qwen/qwen3.8-27b" };
-    const fetchImpl = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        Response.json({
-          id: "or-1",
-          model: r.model,
-          provider: "Approved Host",
-          choices: [{ message: { content: '{"summary":"provisional"}' }, finish_reason: "stop" }],
-          usage: {
-            prompt_tokens: 10,
-            completion_tokens: 20,
-            cost: 0.00003,
-            completion_tokens_details: { reasoning_tokens: 4 },
-          },
-        }),
-      );
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        id: "or-1",
+        model: r.model,
+        provider: "Approved Host",
+        choices: [{ message: { content: '{"summary":"provisional"}' }, finish_reason: "stop" }],
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 20,
+          cost: 0.00003,
+          completion_tokens_details: { reasoning_tokens: 4 },
+        },
+      }),
+    );
     const result = await new OpenRouterProvider({
       apiKey: "secret-router",
       hosts: ["approved-host"],
@@ -126,14 +124,12 @@ describe("provider adapters", () => {
     expect(blockedFetch).not.toHaveBeenCalled();
   });
   it.each([401, 429, 500])("normalizes HTTP %i without leaking provider errors", async (status) => {
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValue(
-        new Response('{"error":"secret-gemini confidential content"}', {
-          status,
-          headers: { "retry-after": "2" },
-        }),
-      );
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response('{"error":"secret-gemini confidential content"}', {
+        status,
+        headers: { "retry-after": "2" },
+      }),
+    );
     const expected =
       status === 401
         ? "AI_NOT_CONFIGURED"
@@ -166,16 +162,14 @@ describe("provider adapters", () => {
   });
   it("preserves Groq strict JSON and input quota enforcement", async () => {
     const r = { ...request, model: "openai/gpt-oss-20b" };
-    const fetchImpl = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        Response.json({
-          id: "groq-1",
-          model: r.model,
-          choices: [{ message: { content: '{"summary":"provisional"}' }, finish_reason: "stop" }],
-          usage: { prompt_tokens: 100, completion_tokens: 30 },
-        }),
-      );
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        id: "groq-1",
+        model: r.model,
+        choices: [{ message: { content: '{"summary":"provisional"}' }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 100, completion_tokens: 30 },
+      }),
+    );
     const provider = new GroqProvider({ apiKey: "secret-groq", fetchImpl });
     expect((await provider.generate(r)).structured).toEqual({ summary: "provisional" });
     expect(
