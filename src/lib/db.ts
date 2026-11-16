@@ -2,7 +2,6 @@ import "server-only";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 
-import { getServerEnv } from "@/config/env.server";
 import { PrismaClient } from "@/generated/prisma/client";
 
 import { PostgresSocket } from "./postgres-socket";
@@ -31,19 +30,21 @@ const globalForPrisma = globalThis as typeof globalThis & {
 /**
  * Lazily create the application client. Lazy creation keeps `next build` from
  * requiring a live database merely because a route module was imported.
+ * Check only the runtime connection string so unrelated AI settings cannot
+ * prevent authenticated workspace reads.
  */
 export function getDb(): PrismaClient {
   if (globalForPrisma.sentinelPrisma) {
     return globalForPrisma.sentinelPrisma;
   }
 
-  const { DATABASE_URL } = getServerEnv();
+  const connectionString = process.env.DATABASE_URL?.trim();
 
-  if (!DATABASE_URL) {
+  if (!connectionString) {
     throw new Error("DATABASE_URL is not configured. See .env.example.");
   }
 
-  const client = createPrismaClient(DATABASE_URL);
+  const client = createPrismaClient(connectionString);
   globalForPrisma.sentinelPrisma = client;
 
   return client;
