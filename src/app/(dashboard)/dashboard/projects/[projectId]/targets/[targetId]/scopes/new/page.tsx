@@ -60,6 +60,25 @@ async function NewScopeContent({ projectId, targetId }: { projectId: string; tar
       targetName={target.name}
       defaultAssetIdentifier={target.assetIdentifier}
       defaultAssetType={target.assetType}
+      defaultDraft={
+        target.scopes[0]?.status === "DRAFT"
+          ? {
+              effectiveFrom: target.scopes[0].effectiveFrom?.toISOString().slice(0, 10) ?? "",
+              effectiveUntil: target.scopes[0].effectiveUntil?.toISOString().slice(0, 10) ?? "",
+              assets: target.scopes[0].assets.map((asset) => ({
+                assetIdentifier: asset.assetIdentifier,
+                assetType: asset.assetType,
+                matchType: asset.matchType,
+                effect: asset.effect,
+                notes: asset.notes ?? "",
+              })),
+              permittedActivities: target.scopes[0].activities
+                .filter((activity) => activity.effect === "PERMITTED")
+                .map((activity) => activity.activity),
+              attestationNotes: target.scopes[0].attestationNotes ?? "",
+            }
+          : undefined
+      }
     />
   );
 }

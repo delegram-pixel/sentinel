@@ -11,6 +11,7 @@ import { getSessionContext } from "@/lib/session";
 import { PrismaJobStore } from "@/modules/tasks/infrastructure/prisma-job-store";
 import { PrismaResearchStore } from "@/modules/research/infrastructure/prisma-research-store";
 import { cancelJobAction, queueAnalysisAction, reconcileUsageAction } from "./actions";
+import { bountyFailureMessage } from "@/modules/bounty/domain/bounty-import";
 export const metadata = { title: "Background work" };
 export default function TasksPage() {
   return (
@@ -92,7 +93,8 @@ async function Content() {
             {jobs.map((j) => (
               <li className="border-b border-border py-4" key={j.id}>
                 <p>
-                  {j.kind.replaceAll("_", " ")} · {j.status} · {j.progress}% · Attempt {j.attempts}
+                  {j.kind === "BOUNTY_IMPORT" ? "Bounty import" : j.kind.replaceAll("_", " ")} ·{" "}
+                  {j.status} · {j.progress}% · Attempt {j.attempts}
                 </p>
                 {j.kind === "AI_TASK" &&
                 typeof j.payload === "object" &&
@@ -105,7 +107,18 @@ async function Content() {
                     View analytical results
                   </Link>
                 ) : null}
-                {j.failureCode ? <p className="text-sm text-danger">{j.failureCode}</p> : null}
+                {j.kind === "BOUNTY_IMPORT" && j.requestedBy === s.user.id ? (
+                  <Link className="record-link" href={`/dashboard/projects/new?import=${j.id}`}>
+                    View bounty import
+                  </Link>
+                ) : null}
+                {j.failureCode ? (
+                  <p className="text-sm text-danger">
+                    {j.kind === "BOUNTY_IMPORT"
+                      ? bountyFailureMessage(j.failureCode)
+                      : j.failureCode}
+                  </p>
+                ) : null}
                 {["QUEUED", "RUNNING"].includes(j.status) ? (
                   <ResearchActionForm
                     action={cancelJobAction}

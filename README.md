@@ -27,8 +27,15 @@ yarn dev
 
 AI credentials are optional and server-only. Defaults retain free Groq with `AI_ROUTING_MODE=LEGACY`; live Groq requires its ZDR attestation. To use Gemini/OpenRouter, follow `.env.example` and the [runtime guide](docs/AI-MULTI-MODEL.md): explicit paid opt-in, spending caps and provider privacy approvals are required. Run `yarn db:deploy`, `yarn db:generate` and `yarn worker` for durable AI work. `AI_USE_MOCK_PROVIDER=true` enables development mocks; `yarn ai:evaluate` scores synthetic/archived outputs without API calls.
 
+The worker loads the same `.env*` hierarchy as Next.js, including `.env.local`. It defaults to development; set `NODE_ENV=production` for a deployed worker. After enabling Zero Data Retention in your Groq organization, set `GROQ_ZDR_ENABLED=true` and restart the app and worker. An empty or false value blocks live Groq requests.
+
 Open <http://localhost:3000>. The authenticated workspace is at `/dashboard`; account, workspace,
 membership, and audit details are at `/dashboard/settings`.
+
+**Projects → New project → Import bounty with AI** reads a public program URL or pasted policy,
+then prefills project, target, and scope fields for review. Saving keeps targets unverified and
+scopes as drafts. See the [bounty import guide](docs/BOUNTY-IMPORT.md) for the migration, worker
+setup, private-program fallback, and limits.
 
 Every variable in `.env.example` is optional in development. Production requires the values listed
 in `src/config/env.schema.ts`; the server refuses to start without them.

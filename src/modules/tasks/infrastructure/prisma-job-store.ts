@@ -94,29 +94,32 @@ export class PrismaJobStore implements JobStore {
     });
   }
   async claim(): Promise<JobRow | null> {
-    return this.db.$transaction(async (tx) => {
-      const now = new Date();
-      const exhausted = await tx.$queryRaw<Array<{ id: string }>>(
-        Prisma.sql`UPDATE "BackgroundJob" SET status = 'FAILED', "failureCode" = 'LEASE_RETRIES_EXHAUSTED', "leaseToken" = NULL, "leaseUntil" = NULL WHERE status = 'RUNNING' AND "leaseUntil" < ${now} AND attempts >= "maxAttempts" RETURNING id`,
-      );
-      for (const job of exhausted)
-        await settleInterruptedAiTasks(tx, job.id, "FAILED", "AI_LEASE_RETRIES_EXHAUSTED");
-      const rows = await tx.$queryRaw<Array<{ id: string }>>(
-        Prisma.sql`SELECT id FROM "BackgroundJob" WHERE "cancelRequestedAt" IS NULL AND attempts < "maxAttempts" AND ((status = 'QUEUED' AND "availableAt" <= ${now}) OR (status = 'RUNNING' AND "leaseUntil" < ${now})) ORDER BY "availableAt", "createdAt" FOR UPDATE SKIP LOCKED LIMIT 1`,
-      );
-      const id = rows[0]?.id;
-      if (!id) return null;
-      return tx.backgroundJob.update({
-        where: { id },
-        data: {
-          status: "RUNNING",
-          attempts: { increment: 1 },
-          leaseToken: randomUUID(),
-          leaseUntil: new Date(now.getTime() + LEASE_MS),
-          heartbeatAt: now,
-        },
-      });
-    });
+    return this.db.$transaction(
+      async (tx) => {
+        const now = new Date();
+        const exhausted = await tx.$queryRaw<Array<{ id: string }>>(
+          Prisma.sql`UPDATE "BackgroundJob" SET status = 'FAILED', "failureCode" = 'LEASE_RETRIES_EXHAUSTED', "leaseToken" = NULL, "leaseUntil" = NULL WHERE status = 'RUNNING' AND "leaseUntil" < ${now} AND attempts >= "maxAttempts" RETURNING id`,
+        );
+        for (const job of exhausted)
+          await settleInterruptedAiTasks(tx, job.id, "FAILED", "AI_LEASE_RETRIES_EXHAUSTED");
+        const rows = await tx.$queryRaw<Array<{ id: string }>>(
+          Prisma.sql`SELECT id FROM "BackgroundJob" WHERE "cancelRequestedAt" IS NULL AND attempts < "maxAttempts" AND ((status = 'QUEUED' AND "availableAt" <= ${now}) OR (status = 'RUNNING' AND "leaseUntil" < ${now})) ORDER BY "availableAt", "createdAt" FOR UPDATE SKIP LOCKED LIMIT 1`,
+        );
+        const id = rows[0]?.id;
+        if (!id) return null;
+        return tx.backgroundJob.update({
+          where: { id },
+          data: {
+            status: "RUNNING",
+            attempts: { increment: 1 },
+            leaseToken: randomUUID(),
+            leaseUntil: new Date(now.getTime() + LEASE_MS),
+            heartbeatAt: now,
+          },
+        });
+      },
+      { maxWait: 20_000 },
+    );
   }
   async heartbeat(job: JobRow, progress = job.progress) {
     return (

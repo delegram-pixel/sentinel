@@ -18,7 +18,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
       progress: job.progress,
       attempts: job.attempts,
       failureCode: job.failureCode,
-      result: job.result,
+      result:
+        job.kind === "BOUNTY_IMPORT"
+          ? {
+              draft: (job.result as { draft?: unknown } | null)?.draft,
+              savedProjectId: (job.result as { savedProjectId?: string } | null)?.savedProjectId,
+            }
+          : job.result,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

@@ -1,4 +1,5 @@
 import "server-only";
+import { bountyUsage } from "@/modules/bounty/infrastructure/bounty-usage";
 import { persistAgentAssessments } from "./agent-result-store";
 import { createHash } from "node:crypto";
 import { AiError } from "../domain/ai-errors";
@@ -211,7 +212,9 @@ export class PrismaAIStore implements AiStore {
         0,
       );
     if (
-      sum(rows.filter((row) => row.startedAt >= since || Number(row.reservedCostUsd) > 0)) + cost >
+      sum(rows.filter((row) => row.startedAt >= since || Number(row.reservedCostUsd) > 0)) +
+        (await bountyUsage(tx)).costUsd +
+        cost >
         env.AI_MAX_DAILY_COST_USD ||
       sum(rows.filter((row) => taskIds.includes(row.taskId))) + cost > env.AI_MAX_TASK_COST_USD
     )
@@ -325,7 +328,10 @@ export class PrismaAIStore implements AiStore {
             (total, row) => total + row.reservedTokens + row.inputTokens + row.outputTokens,
             0,
           );
-          if (used + needed - task.reservedTokens > AI_DAILY_USER_TOKEN_CAP)
+          if (
+            used + (await bountyUsage(tx, task.requestedBy)).tokens + needed - task.reservedTokens >
+            AI_DAILY_USER_TOKEN_CAP
+          )
             throw new AiError("AI_BUDGET_EXCEEDED");
           await tx.aITask.update({ where: { id: taskId }, data: { reservedTokens: needed } });
         }
@@ -1098,7 +1104,9 @@ export class PrismaAIStore implements AiStore {
       );
       const reservation =
         data.reservationTokens ?? 2 * (data.inputTokenBudget + data.outputTokenBudget);
-      const budgetExceeded = used + reservation > AI_DAILY_USER_TOKEN_CAP;
+      const budgetExceeded =
+        used + (await bountyUsage(tx, data.requestedBy)).tokens + reservation >
+        AI_DAILY_USER_TOKEN_CAP;
 
       const investigation = await tx.investigation.findFirst({
         where: { id: data.investigationId, workspaceId: data.workspaceId },
@@ -1444,7 +1452,11 @@ export class PrismaAIStore implements AiStore {
       _sum: { inputTokens: true, outputTokens: true },
     });
 
-    return (usage._sum.inputTokens ?? 0) + (usage._sum.outputTokens ?? 0);
+    return (
+      (usage._sum.inputTokens ?? 0) +
+      (usage._sum.outputTokens ?? 0) +
+      (await bountyUsage(this.db, userId)).tokens
+    );
   }
 
   async createAiSessionSummary(

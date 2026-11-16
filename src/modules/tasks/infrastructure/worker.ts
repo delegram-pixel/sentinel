@@ -12,6 +12,7 @@ import { cleanupDeletedEvidence } from "@/modules/evidence/infrastructure/eviden
 import { createEvidenceStorage } from "@/modules/evidence/infrastructure/storage-factory";
 import { processToolImport } from "@/modules/imports/infrastructure/prisma-import-store";
 import { promoteReviewedEvidence } from "@/modules/evidence/infrastructure/evidence-promotion";
+import { executeBountyImport } from "@/modules/bounty/infrastructure/bounty-import-worker";
 
 export async function processNextResearchJob(
   db: Prisma.TransactionClient,
@@ -44,6 +45,7 @@ export async function processNextResearchJob(
     const actor = { workspaceId: job.workspaceId, userId: job.requestedBy, role: member.role };
     let result: unknown;
     if (job.kind === "AI_TASK") result = await executeAiJob(db, ai, job);
+    else if (job.kind === "BOUNTY_IMPORT") result = await executeBountyImport(db, ai, job);
     else if (job.kind === "KNOWLEDGE_INDEX")
       result = await processKnowledgeDocument(
         db,

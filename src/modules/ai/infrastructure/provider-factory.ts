@@ -137,7 +137,12 @@ export function createAIProvider(): AIProvider {
     return {
       name: "unavailable",
       async generate() {
-        throw new AiError("AI_NOT_CONFIGURED");
+        throw new AiError(
+          "AI_NOT_CONFIGURED",
+          env.AI_PROVIDER === "GROQ" && apiKey && !env.GROQ_ZDR_ENABLED
+            ? "Groq AI is blocked because GROQ_ZDR_ENABLED is not true. Enable Zero Data Retention in your Groq organization, then set GROQ_ZDR_ENABLED=true and restart the app and background worker."
+            : undefined,
+        );
       },
     };
 

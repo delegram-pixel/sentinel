@@ -189,7 +189,18 @@ export function ScopeDetailView({
           </p>
         </ResearchSection>
       ) : null}
-      {canEdit && scope.status === "DRAFT" ? (
+      {canEdit && scope.status === "DRAFT" && (!scope.effectiveFrom || !scope.effectiveUntil) ? (
+        <Alert variant="warning" role="note">
+          <AlertDescription>
+            This draft needs permission dates before activation.{" "}
+            <Link href={`${targetPath}/scopes/new`} className="record-link">
+              Complete a scope version
+            </Link>{" "}
+            using these saved boundaries.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {canEdit && scope.status === "DRAFT" && scope.effectiveFrom && scope.effectiveUntil ? (
         <ResearchSection
           id="scope-activation"
           title="Activate this scope"

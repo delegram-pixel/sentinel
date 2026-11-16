@@ -1,4 +1,5 @@
 import { AiError } from "../domain/ai-errors";
+import { BOUNTY_IMPORT_TOOL } from "@/modules/bounty/domain/bounty-import";
 import type { AiTaskType } from "../domain/ai-config";
 
 import type {
@@ -241,7 +242,23 @@ export class MockAIProvider implements AIProvider {
             ? unknownReferenceOutput(request.taskType)
             : (this.outputs[request.taskType] ?? validOutput(request.taskType, request));
     if (this.scenario === "valid") {
-      if (["BATCH_REVIEW", "BATCH_MERGE"].includes(request.purpose ?? "")) {
+      if (
+        request.structuredOutput.toolName === BOUNTY_IMPORT_TOOL &&
+        !this.outputs[request.taskType]
+      ) {
+        structured = {
+          name: "",
+          description: "",
+          programName: "",
+          authorizationNotes: "",
+          effectiveFrom: null,
+          effectiveUntil: null,
+          assets: [],
+          warnings: [
+            "The development mock provider is active. No live AI extraction was performed. Configure a live provider, or fill these fields yourself.",
+          ],
+        };
+      } else if (["BATCH_REVIEW", "BATCH_MERGE"].includes(request.purpose ?? "")) {
         const batch = JSON.parse(request.messages.at(-1)!.content).untrustedBatch;
         structured = {
           summary: "Mock provisional notes; no assessment was performed.",

@@ -51,6 +51,13 @@ type ScopeDraftFormProps = {
   targetName: string;
   defaultAssetIdentifier: string;
   defaultAssetType: AssetType;
+  defaultDraft?: {
+    effectiveFrom: string;
+    effectiveUntil: string;
+    assets: Omit<AssetRow, "id">[];
+    permittedActivities: string[];
+    attestationNotes: string;
+  };
 };
 
 function initialRows(assetIdentifier: string, assetType: AssetType): AssetRow[] {
@@ -86,6 +93,7 @@ export function ScopeDraftForm({
   targetName,
   defaultAssetIdentifier,
   defaultAssetType,
+  defaultDraft,
 }: ScopeDraftFormProps) {
   const [state, formAction, pending] = useActionState(
     createScopeDraftAction,
@@ -93,9 +101,11 @@ export function ScopeDraftForm({
   );
   const formRef = useFormErrorFocus(state);
   const [rows, setRows] = useState<AssetRow[]>(() =>
-    initialRows(defaultAssetIdentifier, defaultAssetType),
+    defaultDraft?.assets.length
+      ? defaultDraft.assets.map((asset, index) => ({ ...asset, id: index + 1 }))
+      : initialRows(defaultAssetIdentifier, defaultAssetType),
   );
-  const nextId = useRef(2);
+  const nextId = useRef(rows.length + 1);
 
   function updateRow(id: number, patch: Partial<AssetRow>) {
     setRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -152,6 +162,7 @@ export function ScopeDraftForm({
             <Input
               id="effective-from"
               name="effectiveFrom"
+              defaultValue={defaultDraft?.effectiveFrom}
               type="date"
               required
               aria-invalid={Boolean(state.fieldErrors?.effectiveFrom)}
@@ -175,6 +186,7 @@ export function ScopeDraftForm({
             <Input
               id="effective-until"
               name="effectiveUntil"
+              defaultValue={defaultDraft?.effectiveUntil}
               type="date"
               required
               aria-invalid={Boolean(state.fieldErrors?.effectiveUntil)}
@@ -395,6 +407,7 @@ export function ScopeDraftForm({
                   type="checkbox"
                   name="permittedActivities"
                   value={capability}
+                  defaultChecked={defaultDraft?.permittedActivities.includes(capability)}
                   className="mt-1 size-4 rounded border-input accent-primary"
                 />
                 <div className="min-w-0">
@@ -433,6 +446,7 @@ export function ScopeDraftForm({
             <Textarea
               id="scope-draft-notes"
               name="attestationNotes"
+              defaultValue={defaultDraft?.attestationNotes}
               rows={4}
               maxLength={2000}
               placeholder="Why this window, these assets, and these activities?"

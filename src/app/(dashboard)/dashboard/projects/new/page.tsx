@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { ProjectForm } from "@/components/research/project-form";
+import { NewProjectForm } from "@/components/research/new-project-form";
 import { FormPage, FormSkeleton } from "@/components/shared/form-page";
 import { getSessionContext } from "@/lib/session";
 
@@ -9,25 +9,29 @@ export const metadata: Metadata = {
   title: "New project",
 };
 
-export default function NewProjectPage() {
+export default function NewProjectPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ import?: string }>;
+}) {
   return (
     <FormPage
       title="New project"
-      description="Give your research a name and a purpose. Create the project first, then add targets, define their scope, and start exploring your questions."
+      description="Import a bug bounty program with AI, or create a project yourself. Review its targets and scope before starting your research."
       backHref="/dashboard/projects"
       backLabel="All projects"
     >
       <Suspense fallback={<ProjectFormSkeleton />}>
-        <NewProjectContent />
+        <NewProjectContent searchParams={searchParams} />
       </Suspense>
     </FormPage>
   );
 }
 
-async function NewProjectContent() {
+async function NewProjectContent({ searchParams }: { searchParams: Promise<{ import?: string }> }) {
   await getSessionContext();
-
-  return <ProjectForm mode="create" />;
+  const query = await searchParams;
+  return <NewProjectForm initialJobId={query.import} />;
 }
 
 function ProjectFormSkeleton() {

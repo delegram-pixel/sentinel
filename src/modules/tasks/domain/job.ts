@@ -1,6 +1,7 @@
 import { z } from "zod";
 export const JOB_KINDS = [
   "AI_TASK",
+  "BOUNTY_IMPORT",
   "KNOWLEDGE_INDEX",
   "TOOL_IMPORT",
   "EVIDENCE_CLEANUP",
