@@ -12,6 +12,15 @@ function emptyToUndefined(value: unknown): unknown {
   return value;
 }
 
+/** Vercel's pulled build environment redacts Sensitive settings until runtime. */
+function unavailableAiSettingToUndefined(value: unknown): unknown {
+  if (typeof value === "string" && value.trim() === "[SENSITIVE]") {
+    return undefined;
+  }
+
+  return emptyToUndefined(value);
+}
+
 const optionalSecret = z.preprocess(emptyToUndefined, z.string().min(1).optional());
 const optionalString = z.preprocess(emptyToUndefined, z.string().min(1).optional());
 const httpUrl = z
@@ -19,16 +28,13 @@ const httpUrl = z
   .url()
   .refine((value) => /^https?:\/\//i.test(value), "Must be an http(s) URL.");
 const optionalUrl = z.preprocess(emptyToUndefined, httpUrl.optional());
-const optionalBoolean = z.preprocess((value) => {
+const optionalBoolean = z.preprocess((raw) => {
+  const value = unavailableAiSettingToUndefined(raw);
   if (typeof value !== "string") {
     return value;
   }
 
   const normalized = value.trim().toLowerCase();
-
-  if (normalized === "") {
-    return undefined;
-  }
 
   if (normalized === "true" || normalized === "1") {
     return true;
@@ -83,7 +89,7 @@ export const serverEnvSchema = z
     AI_SUMMARY_MODEL: optionalSecret,
     AI_USE_MOCK_PROVIDER: optionalBoolean,
     AI_ROUTING_MODE: z.preprocess(
-      emptyToUndefined,
+      unavailableAiSettingToUndefined,
       z.enum(["LEGACY", "MULTI_MODEL"]).default("LEGACY"),
     ),
     GEMINI_API_KEY: optionalSecret,

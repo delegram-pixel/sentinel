@@ -22,6 +22,16 @@ const completeProductionEnv = {
   GROQ_ZDR_ENABLED: "true",
 } as const;
 
+const aiBooleanSettings = [
+  "GROQ_ZDR_ENABLED",
+  "AI_USE_MOCK_PROVIDER",
+  "GEMINI_PAID_API_ENABLED",
+  "GEMINI_CONFIDENTIAL_DATA_APPROVED",
+  "OPENROUTER_PRIVACY_APPROVED",
+  "OPENROUTER_ZDR_ENABLED",
+  "AI_ALLOW_PAID_MODELS",
+] as const;
+
 describe("environment contract", () => {
   it("provides development defaults", () => {
     const env = parseServerEnv({});
@@ -42,6 +52,37 @@ describe("environment contract", () => {
     expect(env.DATABASE_URL).toBeUndefined();
     expect(env.CLERK_SECRET_KEY).toBeUndefined();
     expect(env.UPLOADTHING_TOKEN).toBeUndefined();
+  });
+
+  it("allows Vercel's redacted AI settings during production builds without enabling approvals", () => {
+    const source = {
+      ...completeProductionEnv,
+      ...Object.fromEntries(aiBooleanSettings.map((key) => [key, "[SENSITIVE]"])),
+      AI_ROUTING_MODE: "[SENSITIVE]",
+      CLERK_SECRET_KEY: "[SENSITIVE]",
+    };
+    const env = parseServerEnv(source);
+
+    for (const key of aiBooleanSettings) expect(env[key]).toBeUndefined();
+    expect(env.AI_ROUTING_MODE).toBe("LEGACY");
+    expect(env.CLERK_SECRET_KEY).toBe("[SENSITIVE]");
+    expect(() => assertProductionEnv(source)).not.toThrow();
+  });
+
+  it("keeps explicit false AI flags disabled and honors the configured routing mode", () => {
+    const env = parseServerEnv({
+      ...completeProductionEnv,
+      ...Object.fromEntries(aiBooleanSettings.map((key) => [key, "false"])),
+      AI_ROUTING_MODE: "MULTI_MODEL",
+    });
+
+    for (const key of aiBooleanSettings) expect(env[key]).toBe(false);
+    expect(env.AI_ROUTING_MODE).toBe("MULTI_MODEL");
+  });
+
+  it("still rejects malformed AI settings instead of treating arbitrary strings as approvals", () => {
+    expect(() => parseServerEnv({ GROQ_ZDR_ENABLED: "yes" })).toThrow();
+    expect(() => parseServerEnv({ AI_ROUTING_MODE: "UNKNOWN" })).toThrow();
   });
 
   it("rejects malformed urls and unknown log levels", () => {

@@ -37,3 +37,21 @@ it("selects the live Groq adapter when the key and retention confirmation are co
 
   expect(createAIProvider().name).toBe("GROQ");
 });
+
+it("does not call a live provider with a redacted retention confirmation", async () => {
+  vi.spyOn(environment, "getServerEnv").mockReturnValue(
+    parseServerEnv({
+      NODE_ENV: "production",
+      GROQ_API_KEY: "test-key",
+      GROQ_ZDR_ENABLED: "[SENSITIVE]",
+      AI_USE_MOCK_PROVIDER: "[SENSITIVE]",
+      AI_ROUTING_MODE: "[SENSITIVE]",
+    }),
+  );
+  const fetch = vi.spyOn(globalThis, "fetch");
+  const provider = createAIProvider();
+
+  expect(provider.name).toBe("unavailable");
+  await expect(provider.generate(request)).rejects.toMatchObject({ code: "AI_NOT_CONFIGURED" });
+  expect(fetch).not.toHaveBeenCalled();
+});
